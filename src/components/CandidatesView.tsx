@@ -1126,9 +1126,10 @@ startxref
       {/* Candidates Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <table className="w-full text-left text-xs border-collapse min-w-[1200px]">
+          <table className="w-full text-left text-xs border-collapse min-w-[1250px]"> {/* Sedikit diperlebar min-width untuk kolom No */}
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="text-slate-600 font-extrabold uppercase tracking-wider text-[10px]">
+                <th className="p-4 border-b border-slate-200 w-12 text-center">No</th>
                 <th className="p-4 border-b border-slate-200">ID Pelamar & Nama</th>
                 <th className="p-4 border-b border-slate-200">Usia & Info</th>
                 <th className="p-4 border-b border-slate-200">Posisi Dilamar</th>
