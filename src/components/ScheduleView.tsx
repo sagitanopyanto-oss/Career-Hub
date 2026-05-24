@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Plus, Search, Edit3, Trash2, Calendar, Clock, Video, Phone, MapPin, 
-  CheckCircle2, XCircle, Clock3, X, UserCheck, FileText
+  CheckCircle2, XCircle, Clock3, X, UserCheck, FileText, FilterX
 } from 'lucide-react';
 import { InterviewSchedule, Candidate, Job } from '../data/mockData';
 
@@ -22,7 +22,13 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   onAddSchedule, onUpdateSchedule, onDeleteSchedule,
   canCreate = true, canUpdate = true, canDelete = true
 }) => {
+  // 🔹 STATE SEARCH & FILTER
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<string>('All');
+  const [filterMethod, setFilterMethod] = useState<string>('All');
+  const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [filterHasil, setFilterHasil] = useState<string>('All');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<InterviewSchedule | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'review'>('create');
@@ -135,11 +141,31 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     setIsModalOpen(false);
   };
 
-  const filteredSchedules = schedules.filter(s => 
-    s.nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.interviewer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.posisiDilamar.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 🔹 LOGIKA FILTERING GABUNGAN (SEARCH + DROPDOWN)
+  const filteredSchedules = schedules.filter(s => {
+    // 1. Filter by Search Term
+    const matchesSearch = 
+      s.nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.interviewer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.posisiDilamar.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    // 2. Filter by Dropdowns
+    if (filterType !== 'All' && s.type !== filterType) return false;
+    if (filterMethod !== 'All' && s.method !== filterMethod) return false;
+    if (filterStatus !== 'All' && s.status !== filterStatus) return false;
+    
+    // Handle hasil interview (bisa undefined/kosong)
+    const schedHasil = s.hasilInterview || '';
+    if (filterHasil === 'Belum Review') {
+      if (schedHasil !== '') return false;
+    } else if (filterHasil !== 'All') {
+      if (schedHasil !== filterHasil) return false;
+    }
+
+    return true;
+  });
 
   const getMethodIcon = (method: string) => {
     switch (method) {
@@ -171,6 +197,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${style}`}>{hasil}</span>;
   };
 
+  const isFilterActive = filterType !== 'All' || filterMethod !== 'All' || filterStatus !== 'All' || filterHasil !== 'All' || searchTerm;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -186,11 +214,90 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         )}
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-        <div className="relative w-full max-w-md">
+      {/* 🔹 SEARCH & FILTER BAR (SEJAJAR) */}
+      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        
+        {/* Search Input */}
+        <div className="relative w-full lg:w-1/3">
           <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
-          <input type="text" placeholder="Cari jadwal berdasarkan nama kandidat, user, atau posisi..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full text-xs font-semibold pl-9 pr-3 py-3 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" />
+          <input 
+            type="text" 
+            placeholder="Cari nama, posisi, atau interviewer..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full text-xs font-semibold pl-9 pr-3 py-3 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" 
+          />
+        </div>
+
+        {/* Filter Dropdowns Group */}
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto items-center">
+          
+          {/* Filter Tipe */}
+          <select 
+            value={filterType} 
+            onChange={(e) => setFilterType(e.target.value)}
+            className="text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white min-w-[120px]"
+          >
+            <option value="All">Semua Tipe</option>
+            <option value="Technical">Technical</option>
+            <option value="HR">HR</option>
+            <option value="User">User</option>
+            <option value="Final">Final</option>
+          </select>
+
+          {/* Filter Metode */}
+          <select 
+            value={filterMethod} 
+            onChange={(e) => setFilterMethod(e.target.value)}
+            className="text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white min-w-[120px]"
+          >
+            <option value="All">Semua Metode</option>
+            <option value="Online">Online</option>
+            <option value="Offline">Offline</option>
+            <option value="Phone">Phone</option>
+          </select>
+
+          {/* Filter Status */}
+          <select 
+            value={filterStatus} 
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white min-w-[120px]"
+          >
+            <option value="All">Semua Status</option>
+            <option value="Schedule">Terjadwal</option>
+            <option value="Completed">Selesai</option>
+            <option value="Cancelled">Dibatalkan</option>
+          </select>
+
+          {/* Filter Hasil */}
+          <select 
+            value={filterHasil} 
+            onChange={(e) => setFilterHasil(e.target.value)}
+            className="text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white min-w-[140px]"
+          >
+            <option value="All">Semua Hasil</option>
+            <option value="Lulus">Lulus</option>
+            <option value="Tidak Lulus">Tidak Lulus</option>
+            <option value="Dipertimbangkan">Dipertimbangkan</option>
+            <option value="Belum Review">Belum Review</option>
+          </select>
+
+          {/* Reset Button */}
+          {isFilterActive && (
+            <button 
+              onClick={() => {
+                setFilterType('All');
+                setFilterMethod('All');
+                setFilterStatus('All');
+                setFilterHasil('All');
+                setSearchTerm('');
+              }}
+              className="flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2.5 rounded-lg border border-transparent transition-colors"
+              title="Reset Semua Filter"
+            >
+              <FilterX className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
         </div>
       </div>
 
@@ -277,8 +384,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 <tr>
                   <td colSpan={10} className="px-4 py-12 text-center">
                     <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                    <p className="font-bold text-slate-600">Tidak ada jadwal wawancara</p>
-                    <p className="text-slate-400 text-xs mt-1">Gunakan tombol "Buat Jadwal Baru" untuk menambahkan jadwal.</p>
+                    <p className="font-bold text-slate-600">Tidak ada jadwal ditemukan</p>
+                    <p className="text-slate-400 text-xs mt-1">Coba ubah kata kunci pencarian atau filter yang dipilih.</p>
                   </td>
                 </tr>
               )}
