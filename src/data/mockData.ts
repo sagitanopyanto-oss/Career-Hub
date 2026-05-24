@@ -46,6 +46,7 @@ export interface Candidate {
   keterangan: string;
 }
 
+// 🔹 PERBAIKAN INTERFACE: Tambah field hasilInterview & keterangan
 export interface InterviewSchedule {
   id: string;
   kandidatId: string;
@@ -58,6 +59,8 @@ export interface InterviewSchedule {
   method: 'Phone' | 'Online' | 'Offline';
   status: 'Schedule' | 'Completed' | 'Cancelled';
   interviewer: string;
+  hasilInterview?: 'Lulus' | 'Tidak Lulus' | 'Dipertimbangkan';
+  keterangan?: string;
 }
 
 export interface HistoryLog {
@@ -522,6 +525,7 @@ export const INITIAL_CANDIDATES: Candidate[] = [
   }
 ];
 
+// 🔹 PERBAIKAN DATA MOCK: Tambah field hasilInterview & keterangan
 export const INITIAL_INTERVIEWS: InterviewSchedule[] = [
   {
     id: "INT-001",
@@ -535,6 +539,7 @@ export const INITIAL_INTERVIEWS: InterviewSchedule[] = [
     method: "Online",
     status: "Schedule",
     interviewer: "Yosef (Head of Design)"
+    // Belum ada hasil karena status masih Schedule
   },
   {
     id: "INT-002",
@@ -547,7 +552,9 @@ export const INITIAL_INTERVIEWS: InterviewSchedule[] = [
     type: "HR",
     method: "Online",
     status: "Completed",
-    interviewer: "Cindy (HR Recruiter)"
+    interviewer: "Cindy (HR Recruiter)",
+    hasilInterview: "Dipertimbangkan",
+    keterangan: "Komunikasi baik, namun perlu pendalaman teknis React Hooks."
   },
   {
     id: "INT-003",
@@ -560,7 +567,9 @@ export const INITIAL_INTERVIEWS: InterviewSchedule[] = [
     type: "Technical",
     method: "Online",
     status: "Completed",
-    interviewer: "Andi Wibowo (CMO)"
+    interviewer: "Andi Wibowo (CMO)",
+    hasilInterview: "Lulus",
+    keterangan: "Sangat kuat di Meta Ads & Copywriting. Direkomendasikan lanjut ke User Interview."
   },
   {
     id: "INT-004",
@@ -573,7 +582,9 @@ export const INITIAL_INTERVIEWS: InterviewSchedule[] = [
     type: "Final",
     method: "Offline",
     status: "Completed",
-    interviewer: "Aditya (VP of Engineering)"
+    interviewer: "Aditya (VP of Engineering)",
+    hasilInterview: "Lulus",
+    keterangan: "Excellent technical depth & leadership potential. Approved for Offer."
   }
 ];
 
