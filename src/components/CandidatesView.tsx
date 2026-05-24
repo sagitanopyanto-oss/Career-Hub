@@ -1129,6 +1129,7 @@ startxref
           <table className="w-full text-left text-xs border-collapse min-w-[1250px]"> {/* Sedikit diperlebar min-width untuk kolom No */}
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="text-slate-600 font-extrabold uppercase tracking-wider text-[10px]">
+                {/* 🔹 KOLOM BARU: NOMOR URUT */}
                 <th className="p-4 border-b border-slate-200 w-12 text-center">No</th>
                 <th className="p-4 border-b border-slate-200">ID Pelamar & Nama</th>
                 <th className="p-4 border-b border-slate-200">Usia & Info</th>
