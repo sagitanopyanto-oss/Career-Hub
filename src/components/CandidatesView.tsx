@@ -394,7 +394,8 @@ startxref
     const meetsThreshold = cand.ratingKecocokan >= settings.autoScreeningATS;
 
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
+      // 🔹 PERBAIKAN Z-INDEX MENJADI z-[9999]
+      <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
           {/* Header */}
           <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-900 text-white">
@@ -531,7 +532,8 @@ startxref
   const renderCVPreview = (cand: Candidate) => {
     const matchedJob = jobs.find(j => j.judul === cand.posisiDilamar || j.id === cand.posisiDilamar);
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
+      // 🔹 PERBAIKAN Z-INDEX MENJADI z-[9999]
+      <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8 flex flex-col">
           <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
             <div className="flex items-center gap-2">
@@ -785,7 +787,8 @@ startxref
     };
 
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
+      // 🔹 PERBAIKAN Z-INDEX MENJADI z-[9999]
+      <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
           {/* Header */}
           <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-indigo-700 text-white">
@@ -1370,7 +1373,8 @@ startxref
 
       {/* CRUD Candidate Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
+        // 🔹 PERBAIKAN Z-INDEX MENJADI z-[9999]
+        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
             {/* Header */}
             <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
