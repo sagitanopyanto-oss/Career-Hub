@@ -84,7 +84,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
                {/* Top badge */}
                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-xs font-bold text-white/90">
                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                 CAREERHUB ATS v2.0
+                 CAREERHUB ATS v1.0
                </div>
               <div className="space-y-5">
                 <div className="inline-flex flex-col sm:flex-row items-center gap-5 sm:gap-6 rounded-2xl border border-white/10 bg-white/5 px-5 py-5 sm:px-6 sm:py-6 shadow-xl backdrop-blur-sm">
