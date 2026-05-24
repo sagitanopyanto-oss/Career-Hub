@@ -1126,7 +1126,7 @@ startxref
       {/* Candidates Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <table className="w-full text-left text-xs border-collapse min-w-[1250px]"> {/* Sedikit diperlebar min-width untuk kolom No */}
+          <table className="w-full text-left text-xs border-collapse min-w-[1250px]">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
               <tr className="text-slate-600 font-extrabold uppercase tracking-wider text-[10px]">
                 {/* 🔹 KOLOM BARU: NOMOR URUT */}
@@ -1147,7 +1147,8 @@ startxref
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredCandidates.length > 0 ? (
-                filteredCandidates.map((cand) => {
+                // 🔹 PERUBAHAN: Tambahkan 'index' sebagai parameter kedua
+                filteredCandidates.map((cand, index) => {
                   const getTahapBadge = (tahap: string) => {
                     const classes: Record<string, string> = {
                       applied: 'bg-blue-50 text-blue-700 border-blue-100',
@@ -1174,8 +1175,14 @@ startxref
 
                   return (
                     <tr key={cand.id} className="hover:bg-slate-50/50 transition-colors">
+                      
+                      {/* 🔹 KOLOM DATA: NOMOR URUT */}
+                      <td className="p-4 text-center font-medium text-slate-500 align-top">
+                        {index + 1}
+                      </td>
+
                       {/* Name & ID */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-800">{cand.nama}</span>
                           <span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span>
@@ -1183,7 +1190,7 @@ startxref
                       </td>
 
                       {/* Usia & Info */}
-                      <td className="p-4 space-y-0.5 text-slate-500">
+                      <td className="p-4 space-y-0.5 text-slate-500 align-top">
                         <div className="flex flex-col">
                           <span className="font-semibold text-slate-700">{hitungUsia(cand.tanggalLahir)} Tahun</span>
                           <span className="text-[10px] text-slate-400">{cand.gender}</span>
@@ -1191,29 +1198,29 @@ startxref
                       </td>
 
                       {/* Posisi Dilamar */}
-                      <td className="p-4 font-semibold text-slate-800">{cand.posisiDilamar}</td>
+                      <td className="p-4 font-semibold text-slate-800 align-top">{cand.posisiDilamar}</td>
 
                       {/* Contact Info */}
-                      <td className="p-4 space-y-0.5 text-slate-500">
+                      <td className="p-4 space-y-0.5 text-slate-500 align-top">
                         <p className="font-medium text-slate-700">{cand.telepon}</p>
                         <p>{cand.email}</p>
                       </td>
 
                       {/* Education & Experience */}
-                      <td className="p-4 space-y-0.5 text-slate-600">
+                      <td className="p-4 space-y-0.5 text-slate-600 align-top">
                         <p className="font-semibold text-slate-700">{cand.pendidikan} - {cand.jurusan}</p>
                         <p className="text-[10px] text-slate-500">Exp: {cand.pengalaman} Thn ({cand.jabatanTerakhir || 'Fresh Grad'})</p>
                       </td>
 
                       {/* Job Status & Salary */}
-                      <td className="p-4 space-y-0.5 text-slate-600">
+                      <td className="p-4 space-y-0.5 text-slate-600 align-top">
                         <p className="font-semibold text-slate-700">{cand.statusPekerjaan}</p>
                         <p className="text-[10px] text-slate-500">Current: {formatRupiah(cand.currentSalary || 0)}</p>
                         <p className="text-[10px] text-slate-500">Expected: {formatRupiah(cand.expectedSalary)}</p>
                       </td>
 
                       {/* ATS Score */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className="flex items-center gap-1">
                           {getRatingBadge(cand.ratingKecocokan)}
                           <button
@@ -1227,7 +1234,7 @@ startxref
                       </td>
 
                       {/* CV Download / View */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className="flex items-center gap-1 text-slate-500">
                           <button 
                             onClick={() => setPreviewCV(cand)}
@@ -1247,7 +1254,7 @@ startxref
                       </td>
 
                       {/* Phase Pipeline */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className="space-y-0.5 min-w-[140px]">
                           {[
                             { key: 'applied', label: 'Applied', date: cand.tanggalApplied },
@@ -1286,15 +1293,15 @@ startxref
                       </td>
 
                       {/* Keterangan */}
-                      <td className="p-4 max-w-[150px] truncate text-slate-500" title={cand.keterangan}>
+                      <td className="p-4 max-w-[150px] truncate text-slate-500 align-top" title={cand.keterangan}>
                         {cand.keterangan || '-'}
                       </td>
 
                       {/* Tahap Proses */}
-                      <td className="p-4">{getTahapBadge(cand.tahapProses)}</td>
+                      <td className="p-4 align-top">{getTahapBadge(cand.tahapProses)}</td>
 
                       {/* Actions */}
-                      <td className="p-4 text-center">
+                      <td className="p-4 text-center align-top">
                         <div className="flex items-center justify-center gap-1.5 flex-wrap">
                           <button
                             onClick={() => {
@@ -1350,7 +1357,8 @@ startxref
                 })
               ) : (
                 <tr>
-                  <td colSpan={12} className="p-8 text-center text-slate-400">
+                  {/* 🔹 UPDATE COLSPAN MENJADI 13 (Karena ada kolom No) */}
+                  <td colSpan={13} className="p-8 text-center text-slate-400">
                     Tidak ada data kandidat ditemukan.
                   </td>
                 </tr>
