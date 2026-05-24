@@ -99,7 +99,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
                   )}
                   <div className="min-w-0 text-center sm:text-left">
                     <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.45em] text-slate-400">Company Recruitment Platform</p>
-                    <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white">CAREERHUB</h2>
+                    <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white">CareerHub</h2>
                     <p className="mt-1 text-xs sm:text-sm font-semibold text-slate-300">Talent Acquisition • Recruitment Analytics • ATS Management</p>
                   </div>
                 </div>
