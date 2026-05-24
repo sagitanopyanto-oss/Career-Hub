@@ -126,8 +126,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const offeringCount = displayCandidates.filter(c => c.tahapProses === 'offering').length;
   const hiredCount = displayCandidates.filter(c => c.tahapProses === 'hired').length;
 
-  // SLA Table Calculation
-  // We'll calculate SLA compliant and violation rates dynamically for the current dataset
+  // SLA Table Calculation - IMPROVED ROBUSTNESS
   const stages = [
     { key: 'screening', label: 'Screening', startKey: 'tanggalApplied', endKey: 'tanggalScreening' },
     { key: 'interview', label: 'Interview', startKey: 'tanggalScreening', endKey: 'tanggalInterview' },
@@ -149,12 +148,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     let violationCount = 0;
 
     displayCandidates.forEach(c => {
+      // Safe access to date fields
       const startVal = (c as any)[stg.startKey];
       const endVal = (c as any)[stg.endKey];
 
-      if (startVal) {
+      // Only process if start date exists and is valid
+      if (startVal && !isNaN(new Date(startVal).getTime())) {
         candidateCount++;
-        if (endVal) {
+        
+        if (endVal && !isNaN(new Date(endVal).getTime())) {
+          // Completed stage: Calculate actual days
           const days = diffInDays(endVal, startVal);
           if (days <= targetDays) {
             compliantCount++;
@@ -162,12 +165,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             violationCount++;
           }
         } else {
-          // Still in transition
-          const daysSoFar = diffInDays(nowDate.toISOString().split('T')[0], startVal);
+          // In-progress stage: Calculate days so far vs target
+          const todayStr = nowDate.toISOString().split('T')[0];
+          const daysSoFar = diffInDays(todayStr, startVal);
+          
+          // If days so far already exceed target, it's a violation (late)
+          // If still within target, it's compliant (on track)
           if (daysSoFar > targetDays) {
             violationCount++;
           } else {
-            compliantCount++; // within target so far
+            compliantCount++; 
           }
         }
       }
@@ -196,8 +203,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalSlaProcessed = totalCompliant + totalViolation;
   const slaCompliantRate = totalSlaProcessed > 0 ? Math.round((totalCompliant / totalSlaProcessed) * 100) : 0;
 
-  // Calculate Average Days to Hire
-  const hiredCandidates = displayCandidates.filter(c => c.tahapProses === 'hired' && c.tanggalHired);
+  // Calculate Average Days to Hire - IMPROVED SAFETY
+  const hiredCandidates = displayCandidates.filter(c => 
+    c.tahapProses === 'hired' && 
+    c.tanggalHired && 
+    c.tanggalApplied &&
+    !isNaN(new Date(c.tanggalHired).getTime()) &&
+    !isNaN(new Date(c.tanggalApplied).getTime())
+  );
+
   let averageDaysToHire = 0;
   if (hiredCandidates.length > 0) {
     const totalDays = hiredCandidates.reduce((acc, c) => {
