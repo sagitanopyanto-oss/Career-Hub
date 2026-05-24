@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Plus, Search, Edit3, Trash2, Calendar, Clock, Video, Phone, MapPin, 
-  CheckCircle2, XCircle, Clock3, X, UserCheck
+  CheckCircle2, XCircle, Clock3, X, UserCheck, FileText
 } from 'lucide-react';
 import { InterviewSchedule, Candidate, Job } from '../data/mockData';
 
@@ -25,6 +25,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<InterviewSchedule | null>(null);
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'review'>('create');
 
   // Form Fields
   const [formKandidatId, setFormKandidatId] = useState('');
@@ -33,10 +34,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [formDepartment, setFormDepartment] = useState('');
   const [formTanggal, setFormTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [formWaktu, setFormWaktu] = useState('10:00');
-  const [formType, setFormType] = useState<'Technical' | 'HR' | 'User' | 'Final'>('Technical');
-  const [formMethod, setFormMethod] = useState<'Phone' | 'Online' | 'Offline'>('Online');
-  const [formStatus, setFormStatus] = useState<'Schedule' | 'Completed' | 'Cancelled'>('Schedule');
+  const [formType, setFormType] = useState<InterviewSchedule['type']>('Technical');
+  const [formMethod, setFormMethod] = useState<InterviewSchedule['method']>('Online');
+  const [formStatus, setFormStatus] = useState<InterviewSchedule['status']>('Schedule');
   const [formInterviewer, setFormInterviewer] = useState('');
+  const [formHasil, setFormHasil] = useState<string>('');
+  const [formKeterangan, setFormKeterangan] = useState('');
 
   // Candidate Search UI State
   const [candSearchInput, setCandSearchInput] = useState('');
@@ -58,12 +61,18 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     setShowCandDropdown(false);
   };
 
-  const handleOpenAdd = () => {
-    setEditingSchedule(null);
+  const resetForm = () => {
     setFormKandidatId(''); setFormNama(''); setFormPosisiDilamar(''); setFormDepartment('');
     setFormTanggal(new Date().toISOString().split('T')[0]); setFormWaktu('10:00');
     setFormType('Technical'); setFormMethod('Online'); setFormStatus('Schedule');
-    setFormInterviewer(''); setCandSearchInput('');
+    setFormInterviewer(''); setFormHasil(''); setFormKeterangan('');
+    setCandSearchInput('');
+  };
+
+  const handleOpenAdd = () => {
+    setEditingSchedule(null);
+    resetForm();
+    setModalMode('create');
     setIsModalOpen(true);
   };
 
@@ -74,20 +83,55 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     setFormTanggal(sched.tanggal); setFormWaktu(sched.waktu);
     setFormType(sched.type); setFormMethod(sched.method);
     setFormStatus(sched.status); setFormInterviewer(sched.interviewer);
+    setFormHasil(sched.hasilInterview || '');
+    setFormKeterangan(sched.keterangan || '');
     setCandSearchInput(`${sched.kandidatId} - ${sched.nama}`);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenReview = (sched: InterviewSchedule) => {
+    setEditingSchedule(sched);
+    setFormKandidatId(sched.kandidatId); setFormNama(sched.nama);
+    setFormPosisiDilamar(sched.posisiDilamar); setFormDepartment(sched.department);
+    setFormTanggal(sched.tanggal); setFormWaktu(sched.waktu);
+    setFormType(sched.type); setFormMethod(sched.method);
+    setFormStatus(sched.status); setFormInterviewer(sched.interviewer);
+    setFormHasil(sched.hasilInterview || '');
+    setFormKeterangan(sched.keterangan || '');
+    setCandSearchInput(`${sched.kandidatId} - ${sched.nama}`);
+    setModalMode('review');
     setIsModalOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formKandidatId) { alert("Harap pilih kandidat terlebih dahulu!"); return; }
+    if (!formKandidatId && modalMode !== 'review') {
+      alert("Harap pilih kandidat terlebih dahulu!");
+      return;
+    }
+
     const schedData: InterviewSchedule = {
       id: editingSchedule ? editingSchedule.id : `INT-${Math.floor(100 + Math.random() * 900)}`,
-      kandidatId: formKandidatId, nama: formNama, posisiDilamar: formPosisiDilamar,
-      department: formDepartment, tanggal: formTanggal, waktu: formWaktu,
-      type: formType, method: formMethod, status: formStatus, interviewer: formInterviewer
+      kandidatId: formKandidatId,
+      nama: formNama,
+      posisiDilamar: formPosisiDilamar,
+      department: formDepartment,
+      tanggal: formTanggal,
+      waktu: formWaktu,
+      type: formType,
+      method: formMethod,
+      status: formStatus,
+      interviewer: formInterviewer,
+      ...(formHasil && { hasilInterview: formHasil as InterviewSchedule['hasilInterview'] }),
+      ...(formKeterangan && { keterangan: formKeterangan })
     };
-    editingSchedule ? onUpdateSchedule(schedData) : onAddSchedule(schedData);
+
+    if (editingSchedule) {
+      onUpdateSchedule(schedData);
+    } else {
+      onAddSchedule(schedData);
+    }
     setIsModalOpen(false);
   };
 
@@ -97,7 +141,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     s.posisiDilamar.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🔹 Helper Components (Dipisah agar tidak dirender ulang di dalam loop)
   const getMethodIcon = (method: string) => {
     switch (method) {
       case 'Online': return <Video className="w-3.5 h-3.5 text-blue-500" />;
@@ -115,6 +158,17 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       default:
         return <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100"><Clock3 className="w-3 h-3" /> Terjadwal</span>;
     }
+  };
+
+  const getHasilBadge = (hasil?: string) => {
+    if (!hasil) return <span className="text-slate-400 text-[10px] italic">Belum direview</span>;
+    const styles: Record<string, string> = {
+      'Lulus': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      'Tidak Lulus': 'bg-rose-50 text-rose-700 border-rose-200',
+      'Dipertimbangkan': 'bg-amber-50 text-amber-700 border-amber-200'
+    };
+    const style = styles[hasil] || 'bg-slate-50 text-slate-600 border-slate-200';
+    return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${style}`}>{hasil}</span>;
   };
 
   return (
@@ -140,10 +194,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
       </div>
 
-      {/* 🟢 TABEL DATA (PENGGANTI CARD GRID) */}
+      {/* 🟢 TABEL DATA */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-left text-xs sm:text-sm">
+          <table className="w-full min-w-[950px] text-left text-xs sm:text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
                 <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider w-12">No</th>
@@ -153,6 +207,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">Tipe & Metode</th>
                 <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">Interviewer</th>
                 <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">Hasil</th>
+                <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
                 <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
               </tr>
             </thead>
@@ -190,8 +246,19 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                       </div>
                     </td>
                     <td className="px-4 py-3">{getStatusBadge(sched.status)}</td>
+                    <td className="px-4 py-3">{getHasilBadge(sched.hasilInterview)}</td>
+                    <td className="px-4 py-3 max-w-[160px]">
+                      <p className="text-slate-600 text-xs truncate" title={sched.keterangan || ''}>
+                        {sched.keterangan || '-'}
+                      </p>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                        {canUpdate && (
+                          <button onClick={() => handleOpenReview(sched)} className="p-1.5 hover:bg-amber-50 border border-amber-200 rounded-lg text-amber-600 hover:text-amber-700 transition-colors" title="Review Hasil">
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         {canUpdate && (
                           <button onClick={() => handleOpenEdit(sched)} className="p-1.5 hover:bg-indigo-50 border border-slate-200 rounded-lg text-slate-500 hover:text-indigo-600 transition-colors" title="Edit Jadwal">
                             <Edit3 className="w-3.5 h-3.5" />
@@ -208,7 +275,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
+                  <td colSpan={10} className="px-4 py-12 text-center">
                     <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                     <p className="font-bold text-slate-600">Tidak ada jadwal wawancara</p>
                     <p className="text-slate-400 text-xs mt-1">Gunakan tombol "Buat Jadwal Baru" untuk menambahkan jadwal.</p>
@@ -220,22 +287,26 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
       </div>
 
-      {/* CRUD Modal (TIDAK BERUBAH) */}
+      {/* CRUD & REVIEW MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
             <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>
-                <h3 className="font-extrabold text-slate-800 text-lg">{editingSchedule ? 'Ubah Informasi Jadwal' : 'Buat Jadwal Interview'}</h3>
-                <p className="text-slate-400 text-xs mt-0.5">Tautkan kandidat, tentukan waktu wawancara, tipe, dan pewawancara.</p>
+                <h3 className="font-extrabold text-slate-800 text-lg">
+                  {modalMode === 'create' ? 'Buat Jadwal Interview' : modalMode === 'edit' ? 'Ubah Informasi Jadwal' : 'Review Hasil Interview'}
+                </h3>
+                <p className="text-slate-400 text-xs mt-0.5">
+                  {modalMode === 'review' ? 'Isi hasil penilaian dan catatan interviewer.' : 'Tautkan kandidat, tentukan waktu wawancara, tipe, dan pewawancara.'}
+                </p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="relative">
                 <label className="text-xs font-bold text-slate-600 block mb-1">Kandidat Pelamar <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="Ketik ID atau Nama Kandidat..." value={candSearchInput} onChange={(e) => { setCandSearchInput(e.target.value); setShowCandDropdown(true); if(!e.target.value) { setFormKandidatId(''); setFormNama(''); setFormPosisiDilamar(''); setFormDepartment(''); } }} onFocus={() => setShowCandDropdown(true)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 placeholder:text-slate-400" />
-                {showCandDropdown && candSearchInput && (
+                <input type="text" placeholder="Ketik ID atau Nama Kandidat..." value={candSearchInput} onChange={(e) => { setCandSearchInput(e.target.value); setShowCandDropdown(true); if(!e.target.value) { setFormKandidatId(''); setFormNama(''); setFormPosisiDilamar(''); setFormDepartment(''); } }} onFocus={() => setShowCandDropdown(true)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 placeholder:text-slate-400" disabled={modalMode === 'review'} />
+                {showCandDropdown && candSearchInput && modalMode !== 'review' && (
                   <div className="absolute z-10 w-full bg-white border border-slate-200 mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto divide-y divide-slate-100">
                     {searchedCandidates.length > 0 ? searchedCandidates.map(cand => (
                       <div key={cand.id} onClick={() => handleSelectCandidate(cand)} className="px-3.5 py-2 hover:bg-slate-50 cursor-pointer text-xs flex justify-between items-center">
@@ -251,17 +322,41 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 <div><span className="text-slate-400 block font-bold text-[9px] uppercase">POSISI DILAMAR</span><span className="font-bold text-slate-800 block truncate">{formPosisiDilamar || 'Automated fill...'}</span></div>
                 <div className="col-span-2 pt-2 border-t border-slate-200/50"><span className="text-slate-400 block font-bold text-[9px] uppercase">DEPARTEMEN</span><span className="font-bold text-slate-800 block truncate">{formDepartment || 'Automated fill...'}</span></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Tanggal</label><input type="date" required value={formTanggal} onChange={(e) => setFormTanggal(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Waktu (WIB)</label><input type="text" required placeholder="Contoh: 14:00" value={formWaktu} onChange={(e) => setFormWaktu(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Tipe Interview</label><select value={formType} onChange={(e) => setFormType(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Technical">Technical</option><option value="HR">HR</option><option value="User">User</option><option value="Final">Final</option></select></div>
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Metode Interview</label><select value={formMethod} onChange={(e) => setFormMethod(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Online">Online</option><option value="Phone">Phone</option><option value="Offline">Offline</option></select></div>
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Status</label><select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Schedule">Schedule</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select></div>
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Interviewer (User)</label><input type="text" required placeholder="Contoh: Aditya (VP Engineering)" value={formInterviewer} onChange={(e) => setFormInterviewer(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
-              </div>
+              {modalMode !== 'review' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="text-xs font-bold text-slate-600 block mb-1">Tanggal</label><input type="date" required value={formTanggal} onChange={(e) => setFormTanggal(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                  <div><label className="text-xs font-bold text-slate-600 block mb-1">Waktu (WIB)</label><input type="text" required placeholder="Contoh: 14:00" value={formWaktu} onChange={(e) => setFormWaktu(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                  <div><label className="text-xs font-bold text-slate-600 block mb-1">Tipe Interview</label><select value={formType} onChange={(e) => setFormType(e.target.value as InterviewSchedule['type'])} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Technical">Technical</option><option value="HR">HR</option><option value="User">User</option><option value="Final">Final</option></select></div>
+                  <div><label className="text-xs font-bold text-slate-600 block mb-1">Metode Interview</label><select value={formMethod} onChange={(e) => setFormMethod(e.target.value as InterviewSchedule['method'])} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Online">Online</option><option value="Phone">Phone</option><option value="Offline">Offline</option></select></div>
+                  <div><label className="text-xs font-bold text-slate-600 block mb-1">Status</label><select value={formStatus} onChange={(e) => setFormStatus(e.target.value as InterviewSchedule['status'])} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Schedule">Schedule</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select></div>
+                  <div><label className="text-xs font-bold text-slate-600 block mb-1">Interviewer (User)</label><input type="text" required placeholder="Contoh: Aditya (VP Engineering)" value={formInterviewer} onChange={(e) => setFormInterviewer(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                </div>
+              )}
+              {(modalMode === 'edit' || modalMode === 'review') && (
+                <div className="space-y-3 pt-3 border-t border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Review Interview</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-600 block mb-1">Hasil Interview</label>
+                      <select value={formHasil} onChange={(e) => setFormHasil(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white">
+                        <option value="">-- Pilih Hasil --</option>
+                        <option value="Lulus">Lulus</option>
+                        <option value="Tidak Lulus">Tidak Lulus</option>
+                        <option value="Dipertimbangkan">Dipertimbangkan</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-bold text-slate-600 block mb-1">Keterangan / Catatan</label>
+                      <textarea rows={3} placeholder="Contoh: Kandidat kuat di teknis, perlu pendalaman soft-skill..." value={formKeterangan} onChange={(e) => setFormKeterangan(e.target.value)} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 resize-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 p-4 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">Batal</button>
-                <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all">{editingSchedule ? 'Simpan Jadwal' : 'Buat Jadwal'}</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all">
+                  {modalMode === 'review' ? 'Simpan Review' : editingSchedule ? 'Simpan Jadwal' : 'Buat Jadwal'}
+                </button>
               </div>
             </form>
           </div>
