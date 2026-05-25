@@ -18,17 +18,29 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
   filterYear = 0,
   filterQuarters = []
 }) => {
-  const [hoveredBar, setHoveredBar] = useState<{ chart: string; index: number; label: string; val1: number; val2?: number; x: number; y: number } | null>(null);
+  // State for Global Tooltip
+  const [hoveredBar, setHoveredBar] = useState<{ 
+    chart: string; 
+    index: number; 
+    label: string; 
+    val1: number; 
+    val2?: number; 
+    x: number; 
+    y: number 
+  } | null>(null);
+
   const departmentNames = settings.budgetCostHiring.map(b => b.department);
   const tooltipWidth = 210;
   const tooltipHeight = 86;
   const filterLabel = filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan';
 
+  // Helper to resolve department from candidate's applied job
   const resolveDepartment = (candidate: Candidate) => {
     const matchedJob = jobs.find((job) => job.judul === candidate.posisiDilamar || job.id === candidate.posisiDilamar);
     return matchedJob?.department || 'Technology';
   };
 
+  // 1. DEPARTMENT DATA (Jobs vs Hired per Dept)
   const deptData = departmentNames.map((department) => {
     const jobsCount = jobs.filter((job) => job.department === department).length;
     const hiredCount = candidates.filter((candidate) => candidate.tahapProses === 'hired' && resolveDepartment(candidate) === department).length;
@@ -40,6 +52,7 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
     };
   });
 
+  // 2. TREND DATA (Jobs vs Hired over Time)
   const buildTrendBuckets = () => {
     const now = new Date();
     const year = filterYear !== 0 ? filterYear : now.getFullYear();
@@ -107,7 +120,7 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
     hired: candidates.reduce((sum, candidate) => sum + countInBucket(candidate.tanggalHired || candidate.tanggalApplied, bucket), 0),
   }));
 
-  // 3. PIPELINE DATA (applied, screening, interview, assessment, medical, offering, hired, rejected)
+  // 3. PIPELINE DATA
   const pipelineStages: { stage: string; label: string; count: number; color: string }[] = [
     { stage: 'applied', label: 'Applied', count: 0, color: 'bg-blue-500' },
     { stage: 'screening', label: 'Screening', count: 0, color: 'bg-indigo-500' },
@@ -119,12 +132,11 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
     { stage: 'rejected', label: 'Rejected', count: 0, color: 'bg-rose-500' },
   ];
 
-  // Count candidates per stage
   pipelineStages.forEach(p => {
     p.count = candidates.filter((candidate) => candidate.tahapProses === p.stage).length;
   });
 
-  // 4. HIRING COST DATA (Actual vs Budget per Department)
+  // 4. HIRING COST DATA
   const hiringCostData = settings.budgetCostHiring.map((budget) => {
     const actual = candidates
       .filter((candidate) => candidate.tahapProses === 'hired' && resolveDepartment(candidate) === budget.department)
@@ -137,14 +149,14 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
     };
   });
 
-  // Formatting currency in Millions IDR
   const formatMuta = (value: number) => {
     return `Rp ${(value / 1000000).toFixed(1)} Jt`;
   };
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 mb-6 relative">
-      {/* Tooltip Overlay */}
+      
+      {/* 🔹 GLOBAL TOOLTIP OVERLAY (DYNAMIC LABELS) */}
       {hoveredBar && (
         <div 
           className="fixed z-[80] bg-slate-900/95 text-white p-3 rounded-lg shadow-xl border border-slate-700 text-xs pointer-events-none"
@@ -153,20 +165,52 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
             top: `${Math.max(12, Math.min(typeof window !== 'undefined' ? window.innerHeight - tooltipHeight - 12 : hoveredBar.y, hoveredBar.y - 50))}px`
           }}
         >
-          <p className="font-semibold text-slate-300">{hoveredBar.label}</p>
-          <div className="mt-1 flex flex-col gap-0.5">
-            <p className="flex justify-between gap-4">
-              <span>Lowongan / Target:</span>
-              <span className="font-bold text-sky-400">{hoveredBar.val1}</span>
-            </p>
-            {hoveredBar.val2 !== undefined && (
-              <p className="flex justify-between gap-4">
-                <span>Hired / Realisasi:</span>
-                <span className="font-bold text-emerald-400">
-                  {hoveredBar.chart === 'cost' ? formatMuta(hoveredBar.val2) : hoveredBar.val2}
-                </span>
-              </p>
-            )}
+          <p className="font-semibold text-slate-300 mb-1">{hoveredBar.label}</p>
+          <div className="flex flex-col gap-0.5">
+            
+            {/* Logic Label Dinamis Berdasarkan Chart Type */}
+            {hoveredBar.chart === 'dept' ? (
+              // Chart 1: Department
+              hoveredBar.label.includes('Hired') ? (
+                 <p className="flex justify-between gap-4">
+                  <span>Kandidat Hired:</span>
+                  <span className="font-bold text-emerald-400">{hoveredBar.val1}</span>
+                </p>
+              ) : (
+                <p className="flex justify-between gap-4">
+                  <span>Lowongan Baru:</span>
+                  <span className="font-bold text-indigo-400">{hoveredBar.val1}</span>
+                </p>
+              )
+            ) : hoveredBar.chart === 'trend' ? (
+              // Chart 2: Trend (Job vs Hired)
+              hoveredBar.label.includes('Hired') ? (
+                <p className="flex justify-between gap-4">
+                  <span>Kandidat Hired:</span>
+                  <span className="font-bold text-indigo-400">{hoveredBar.val1}</span>
+                </p>
+              ) : (
+                <p className="flex justify-between gap-4">
+                  <span>Lowongan Baru:</span>
+                  <span className="font-bold text-blue-400">{hoveredBar.val1}</span>
+                </p>
+              )
+            ) : hoveredBar.chart === 'cost' ? (
+               // Chart 4: Cost Hiring
+               <>
+                <p className="flex justify-between gap-4">
+                  <span>Budget Alokasi:</span>
+                  <span className="font-bold text-slate-300">{formatMuta(hoveredBar.val1)}</span>
+                </p>
+                <p className="flex justify-between gap-4">
+                  <span>Realisasi Aktual:</span>
+                  <span className={`font-bold ${hoveredBar.val2! > hoveredBar.val1 ? 'text-red-400' : 'text-amber-400'}`}>
+                    {formatMuta(hoveredBar.val2!)}
+                  </span>
+                </p>
+               </>
+            ) : null}
+
           </div>
         </div>
       )}
@@ -249,7 +293,7 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
         </div>
       </div>
 
-      {/* Chart 2: Job vs Recruitment Trend (Chart Batang / Bar Trend) */}
+      {/* Chart 2: Job vs Recruitment Trend */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5 hover:shadow-md transition-shadow">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
           <div className="min-w-0">
@@ -383,7 +427,7 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
         </div>
 
         <div className="space-y-5">
-          {hiringCostData.map((data) => {
+          {hiringCostData.map((data, idx) => {
             const budgetPercent = 100;
             const actualPercent = (data.actual / data.budget) * 100;
             const isOverBudget = data.actual > data.budget;
@@ -409,15 +453,41 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
                   {/* Budget Line */}
                   <div className="w-full bg-slate-100 h-2 rounded-full relative overflow-hidden">
                     <div 
-                      className="bg-slate-300 h-full rounded-full"
+                      className="bg-slate-300 h-full rounded-full cursor-pointer"
                       style={{ width: `${budgetPercent}%` }}
+                      onMouseEnter={(e) => {
+                        setHoveredBar({
+                          chart: 'cost',
+                          index: idx,
+                          label: `${data.department} (Budget)`,
+                          val1: data.budget,
+                          val2: data.actual,
+                          x: e.clientX,
+                          y: e.clientY
+                        });
+                      }}
+                      onMouseMove={(e) => setHoveredBar((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
+                      onMouseLeave={() => setHoveredBar(null)}
                     />
                   </div>
                   {/* Actual Line */}
                   <div className="w-full bg-slate-100 h-2 rounded-full relative overflow-hidden">
                     <div 
-                      className={`h-full rounded-full transition-all duration-500 ${isOverBudget ? 'bg-red-500' : 'bg-amber-500'}`}
+                      className={`h-full rounded-full transition-all duration-500 cursor-pointer ${isOverBudget ? 'bg-red-500' : 'bg-amber-500'}`}
                       style={{ width: `${Math.min(actualPercent, 100)}%` }}
+                      onMouseEnter={(e) => {
+                        setHoveredBar({
+                          chart: 'cost',
+                          index: idx,
+                          label: `${data.department} (Realisasi)`,
+                          val1: data.budget,
+                          val2: data.actual,
+                          x: e.clientX,
+                          y: e.clientY
+                        });
+                      }}
+                      onMouseMove={(e) => setHoveredBar((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
+                      onMouseLeave={() => setHoveredBar(null)}
                     />
                   </div>
                 </div>
