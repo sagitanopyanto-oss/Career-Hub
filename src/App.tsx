@@ -169,15 +169,42 @@ export default function App() {
   // CANDIDATE ACTIONS
   const handleAddCandidate = (cand: Candidate) => {
     if (!canCreate(currentRole)) { permissionDenied('mendaftarkan kandidat baru'); return; }
-    setCandidates(prev => [cand, ...prev]);
+
+    // 🔹 PERBAIKAN: Hitung Ulang Skor ATS Jika 0 (Dari Portal Publik)
+    let finalRating = cand.ratingKecocokan;
+    
+    // Jika skor 0 (biasanya dari form publik), lakukan simulasi sederhana
+    // Berdasarkan Pengalaman & Pendidikan (Logika simulasi yang sudah ada di kode sebelumnya)
+    if (finalRating === 0) {
+      const expScore = Math.min(cand.pengalaman * 5, 40); // Max 40 poin dari pengalaman
+      let eduScore = 0;
+      if (cand.pendidikan === 'S2') eduScore = 30;
+      else if (cand.pendidikan === 'S1') eduScore = 20;
+      else if (cand.pendidikan === 'D3') eduScore = 10;
+      
+      // Base score 30 + Exp + Edu
+      finalRating = Math.min(100, 30 + expScore + eduScore);
+    }
+
+    // Buat objek kandidat baru dengan skor yang sudah diperbaiki
+    const processedCand = {
+      ...cand,
+      ratingKecocokan: finalRating
+    };
+
+    setCandidates(prev => [processedCand, ...prev]);
+
     const threshold = settings.autoScreeningATS;
-    const isAutoPassed = cand.ratingKecocokan >= threshold;
+    const isAutoPassed = processedCand.ratingKecocokan >= threshold;
+    
     const atsDetails = isAutoPassed
-      ? `Skor ATS ${cand.ratingKecocokan}% melampaui batas minimum ${threshold}%. Rekomendasi: AUTO-PASS.`
-      : `Skor ATS ${cand.ratingKecocokan}% di bawah batas minimum ${threshold}%. Rekomendasi: REVIEW MANUAL.`;
-    addLog("CREATE", "Kandidat", `${cand.id} - ${cand.nama}`, `Mendaftarkan pelamar baru untuk posisi ${cand.posisiDilamar}.`);
+      ? `Skor ATS ${processedCand.ratingKecocokan}% melampaui batas minimum ${threshold}%. Rekomendasi: AUTO-PASS.`
+      : `Skor ATS ${processedCand.ratingKecocokan}% di bawah batas minimum ${threshold}%. Rekomendasi: REVIEW MANUAL.`;
+
+    addLog("CREATE", "Kandidat", `${processedCand.id} - ${processedCand.nama}`, `Mendaftarkan pelamar baru untuk posisi ${processedCand.posisiDilamar}.`);
+    
     setTimeout(() => {
-      addLog("AUTO-SCREENING", "Kandidat", `${cand.id} - ${cand.nama}`, `Pemindaian CV otomatis oleh ATS. ${atsDetails}`);
+      addLog("AUTO-SCREENING", "Kandidat", `${processedCand.id} - ${processedCand.nama}`, `Pemindaian CV otomatis oleh ATS. ${atsDetails}`);
     }, 400);
   };
 
