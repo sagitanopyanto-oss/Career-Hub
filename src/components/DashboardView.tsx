@@ -226,10 +226,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const targetSlaPercent = slaCompliantRate; // Realisasi aktual dari data terfilter
   const slaGoalPercent = settings.targetSlaManagement ?? 85; // Target SLA dari pengaturan management
 
-  // Mock trend comparison (perbandingan periode sebelumnya)
-  const previousSlaRate = Math.max(0, slaCompliantRate - 2.4);
-  const slaTrend = slaCompliantRate - previousSlaRate;
+    // 🔹 PERBAIKAN: Hitung Trend Dinamis vs Rata-Rata Historis
+  // 1. Hitung total compliant & violation untuk SEMUA kandidat (tanpa filter waktu)
+  let allTimeCompliant = 0;
+  let allTimeViolation = 0;
 
+  candidates.forEach(c => {
+    stages.forEach(stg => {
+      const startVal = (c as any)[stg.startKey];
+      const endVal = (c as any)[stg.endKey];
+      
+      if (startVal && !isNaN(new Date(startVal).getTime())) {
+        const targetSetting = settings.targetSlaDays.find(t => t.stage === stg.key);
+        const targetDays = targetSetting ? targetSetting.targetDays : 3;
+
+        if (endVal && !isNaN(new Date(endVal).getTime())) {
+          const days = diffInDays(endVal, startVal);
+          if (days <= targetDays) allTimeCompliant++;
+          else allTimeViolation++;
+        } else {
+           // Untuk tahap yang belum selesai, kita abaikan dalam perhitungan historis final 
+           // atau anggap compliant jika belum lewat target hari ini
+           const daysSoFar = diffInDays(nowDate.toISOString().split('T')[0], startVal);
+           if (daysSoFar <= targetDays) allTimeCompliant++;
+           else allTimeViolation++;
+        }
+      }
+    });
+  });
+
+  const allTimeTotal = allTimeCompliant + allTimeViolation;
+  const historicalSlaRate = allTimeTotal > 0 ? Math.round((allTimeCompliant / allTimeTotal) * 100) : 0;
+
+  // 2. Hitung Trend (Selisih antara Rate Periode Ini vs Rate Historis)
+  const slaTrend = slaCompliantRate - historicalSlaRate;
+  
   // Recent Applicants
   const recentApplicants = [...displayCandidates]
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
