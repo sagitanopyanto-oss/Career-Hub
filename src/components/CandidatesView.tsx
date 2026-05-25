@@ -731,17 +731,29 @@ startxref
       // 2. Tambahkan info lampiran ke body email jika ada
       if (emailAttachments.length > 0) {
         const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
-        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di jendela compose email Anda karena browser tidak mengizinkan pengiriman file otomatis demi keamanan.)`;
+        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di jendela compose email Anda)`;
       }
 
-      // 3. Encode URI component agar karakter khusus (spasi, enter, simbol) aman di URL
-      const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // 3. Encode URI component agar karakter khusus aman di URL
+      const encodedSubject = encodeURIComponent(subject);
+      const encodedBody = encodeURIComponent(body);
+      const recipient = cand.email;
 
-      // 4. Buka Klien Email Default Pengguna (Outlook, Gmail App, Thunderbird, dll)
-      window.location.href = mailtoLink;
+      // 4. Buat Link Gmail Compose Langsung
+      // Format: https://mail.google.com/mail/?view=cm&fs=1&to=EMAIL&su=SUBJECT&body=BODY
+      const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${encodedSubject}&body=${encodedBody}`;
 
-      // 5. Feedback UI & Reset State
-      alert(`Aplikasi email default Anda akan terbuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
+      // 5. Buka Tab Baru Khusus Gmail
+      // Menggunakan window.open dengan '_blank' memastikan tab baru terbuka di browser yang sama
+      const newWindow = window.open(gmailLink, '_blank');
+
+      // 6. Fallback jika pop-up diblokir
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        alert('Pop-up diblokir oleh browser. Silakan izinkan pop-up untuk situs ini agar fitur email berfungsi.');
+      } else {
+        // Feedback UI & Reset State
+        alert(`Tab Gmail telah dibuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
+      }
       
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
