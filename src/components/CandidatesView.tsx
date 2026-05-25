@@ -463,23 +463,33 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     const handleSendEmail = () => {
       const subject = replacedSubject;
       let body = replacedBody;
+
+      // Tambahkan info lampiran ke body email jika ada
       if (emailAttachments.length > 0) {
         const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
         body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
       }
+
+      // Gunakan mailto: universal (mendukung Outlook, Thunderbird, Yahoo, Apple Mail, dll)
       const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
       if (isMobile) {
         window.location.href = mailtoLink;
         const mobileEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(mobileEmailText).catch(() => { });
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(mobileEmailText).catch(() => {});
+        }
         setTimeout(() => {
-          alert(`📱 Mode Mobile Terdeteksi\n\n1. Jika aplikasi email tidak terbuka otomatis, silakan buka aplikasi email Anda secara manual.\n2. Template email & alamat tujuan sudah disalin ke clipboard.\n3. Paste di kolom "Kepada" & "Isi Pesan", lalu kirim.`);
+          alert('📱 Mode Mobile Terdeteksi\n\n1. Jika aplikasi email tidak terbuka otomatis, silakan buka aplikasi email Anda secara manual.\n2. Template email & alamat tujuan sudah disalin ke clipboard.\n3. Paste di kolom "Kepada" & "Isi Pesan", lalu kirim.');
         }, 300);
       } else {
+        // Desktop: mailto: akan membuka default email client (Outlook, Thunderbird, dll)
         window.location.href = mailtoLink;
-        alert(`Aplikasi email default Anda akan terbuka untuk mengirim pesan ke ${cand.email}.`);
+        alert(`Aplikasi email default Anda akan terbuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
       }
+
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
     };
