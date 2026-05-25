@@ -80,14 +80,23 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
   const openWhatsApp = (cand: Candidate) => {
-    if (!canWhatsapp) { alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.'); return; }
-    if (!settings.whatsappSettings.enabled) { alert('Fitur WhatsApp konfirmasi sedang dinonaktifkan pada menu Pengaturan.'); return; }
+    if (!canWhatsapp) { 
+      alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.\nHubungi administrator jika Anda memerlukan akses ini.'); 
+      return; 
+    }
+    if (!settings.whatsappSettings.enabled) { 
+      alert('Fitur WhatsApp konfirmasi sedang dinonaktifkan pada menu Pengaturan.'); 
+      return; 
+    }
+    
     let phone = cand.telepon.replace(/[^0-9]/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.substring(1);
     else if (!phone.startsWith('62')) phone = '62' + phone;
+    
     const draft = settings.whatsappSettings.confirmationTemplate
       .replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar)
       .replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
+      
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank');
   };
 
@@ -151,6 +160,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       }
       return;
     }
+    // Mock CV content for download if no real file
     const mockContent = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 44>>stream\nBT /F1 12 Tf 50 700 Td (CV - ${cand.nama}) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000266 00000 n \n0000000359 00000 n \ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n415\n%%EOF`;
     const blob = new Blob([mockContent], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -325,7 +335,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
             </div>
           </div>
 
-          {/* ✅ FOOTER ATS - FIXED: Tag <div> lengkap, tanpa tombol salin template */}
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-end">
             <button
               onClick={() => setSelectedCandidateATS(null)}
@@ -460,65 +469,84 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     };
 
+    // 🔹 PERBAIKAN FINAL: Logika Email Universal + Fallback Copy
     const handleSendEmail = () => {
       const subject = replacedSubject;
       let body = replacedBody;
 
       if (emailAttachments.length > 0) {
         const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
-        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di jendela compose email Anda)`;
+        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
       }
 
-      // Deteksi apakah user menggunakan perangkat mobile
+      // Siapkan teks lengkap untuk dicopy (Fallback Utama)
+      const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
+
+      // Coba buka mailto: universal (Outlook, Thunderbird, Gmail Web, dll)
+      const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Deteksi Mobile untuk UX yang lebih baik
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
       if (isMobile) {
-        // MODE MOBILE: Coba buka mailto/gmail, tapi siapkan fallback copy clipboard
-        const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        
-        // Coba buka tab/app
-        window.open(gmailLink, '_blank');
-
-        // Siapkan teks untuk dicopy sebagai backup
-        const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
-        
+        window.location.href = mailtoLink;
         navigator.clipboard.writeText(fullEmailText).then(() => {
-          alert('📱 Mode Mobile Terdeteksi\n\n1. Aplikasi Email/Gmail seharusnya telah terbuka.\n2. Jika tidak, Template & Alamat Tujuan SUDAH DISALIN ke clipboard.\n3. Silakan Paste (Tempel) di kolom Subjek & Isi Pesan.');
+           alert('📱 Mode Mobile Terdeteksi\n\n1. Aplikasi email seharusnya telah terbuka.\n2. Jika tidak, Template & Alamat Tujuan SUDAH DISALIN ke clipboard.\n3. Silakan Paste (Tempel) di kolom Subjek & Isi Pesan.');
         }).catch(() => {
            alert('⚠️ Gagal menyalin template. Silakan copy manual dari preview di atas.');
         });
-
       } else {
-        // MODE DESKTOP: Buka Tab Baru Gmail Langsung
-        const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        const newWindow = window.open(gmailLink, '_blank');
-
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-          alert('⚠️ Pop-up diblokir! Silakan izinkan pop-up untuk situs ini agar fitur email berfungsi.');
-        } else {
-          alert(`✅ Tab Gmail telah dibuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
-        }
+        // Desktop: Coba buka mailto, lalu beri instruksi paste jika gagal/diblokir
+        window.location.href = mailtoLink;
+        
+        // Karena kita tidak bisa mendeteksi apakah mailto berhasil dibuka atau diblokir dengan pasti di semua browser,
+        // Kita asumsikan user perlu instruksi paste sebagai backup yang aman.
+        navigator.clipboard.writeText(fullEmailText).then(() => {
+           alert('✅ Template Email Berhasil Disalin!\n\n1. Aplikasi email default Anda akan terbuka.\n2. Pastikan alamat tujuan sudah terisi.\n3. PASTE (Ctrl+V / Cmd+V) di kolom Subjek dan Isi Pesan.\n4. Lampirkan file secara manual jika diperlukan.');
+        }).catch(() => {
+           alert('⚠️ Gagal menyalin template otomatis. Silakan copy manual dari preview Subject & Body di atas, lalu paste ke email Anda.');
+        });
       }
-      
+
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
     };
-    
+
     const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files || files.length === 0) return;
       const maxSize = 10 * 1024 * 1024;
       const newAttachments: { name: string; size: number; type: string; dataUrl: string }[] = [];
-      Array.from(files).forEach(file => {
-        if (file.size > maxSize) { alert(`File "${file.name}" melebihi batas maksimum 10MB.`); return; }
+      let processedCount = 0;
+
+      Array.from(files).forEach((file) => {
+        if (file.size > maxSize) {
+          alert(`File "${file.name}" melebihi batas maksimum 10MB.`);
+          processedCount++;
+          if (processedCount === files.length) e.target.value = '';
+          return;
+        }
         const reader = new FileReader();
         reader.onloadend = () => {
-          newAttachments.push({ name: file.name, size: file.size, type: file.type || 'application/octet-stream', dataUrl: reader.result as string });
-          if (newAttachments.length === Array.from(files).filter(f => f.size <= maxSize).length) setEmailAttachments(prev => [...prev, ...newAttachments]);
+          newAttachments.push({
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/octet-stream',
+            dataUrl: reader.result as string
+          });
+          processedCount++;
+          if (processedCount === files.length) {
+            setEmailAttachments(prev => [...prev, ...newAttachments]);
+            e.target.value = '';
+          }
+        };
+        reader.onerror = () => {
+          console.error(`Error reading file: ${file.name}`);
+          processedCount++;
+          if (processedCount === files.length) e.target.value = '';
         };
         reader.readAsDataURL(file);
       });
-      e.target.value = '';
     };
 
     const removeAttachment = (index: number) => setEmailAttachments(prev => prev.filter((_, i) => i !== index));
@@ -587,12 +615,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
             <div className="border-t border-slate-200 pt-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <Paperclip className="w-3.5 h-3.5 text-indigo-600" /> Lampiran Attachment
+                  <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
+                  Lampiran Attachment
                   {emailAttachments.length > 0 && <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-[9px] font-extrabold">{emailAttachments.length}</span>}
                 </label>
-                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100 transition-all">
+                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100 transition-all select-none">
                   <Upload className="w-3 h-3" /> Upload File
-                  <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.zip,.rar" onChange={handleAttachmentUpload} className="hidden" />
+                  <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.zip,.rar" onChange={handleAttachmentUpload} className="hidden" id="email-attachment-input" />
                 </label>
               </div>
               {emailAttachments.length === 0 ? (
@@ -625,7 +654,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
             </div>
           </div>
 
-          {/* ✅ FOOTER EMAIL - Tombol Salin Template HANYA di sini */}
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
             {emailAttachments.length > 0 && (
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
