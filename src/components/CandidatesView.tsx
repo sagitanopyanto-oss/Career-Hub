@@ -506,7 +506,7 @@ startxref
               <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block">REKOMENDASI SISTEM</span>
               <p className="text-xs text-slate-700 leading-relaxed font-semibold italic">
                 {cand.ratingKecocokan >= 85 
-                  ? `"Kandidat ${cand.nama}sangat kuat. Portofolio & latar belakang menunjukkan kecocokan sangat tinggi. Segera jadwalkan wawancara teknis."`
+                  ? `"Kandidat ${cand.nama} sangat kuat. Portofolio & latar belakang menunjukkan kecocokan sangat tinggi. Segera jadwalkan wawancara teknis."`
                   : cand.ratingKecocokan >= 70
                   ? `"Kandidat memenuhi syarat utama. Pengalaman kerja cukup memadai untuk posisi dilamar. Jadwalkan interview awal."`
                   : `"Kandidat terindikasi memiliki beberapa keahlian gap. Harap lakukan konfirmasi skill tambahan saat interview HR jika dilanjutkan."`}
