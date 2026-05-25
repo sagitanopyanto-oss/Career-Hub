@@ -470,18 +470,17 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
         body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
       }
 
-      // Siapkan teks lengkap untuk dicopy (Format standar email)
+      // Siapkan teks lengkap untuk dicopy (Format standar email agar mudah paste)
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // 1. Copy ke Clipboard (Prioritas Utama)
+      // Copy ke Clipboard
       navigator.clipboard.writeText(fullEmailText).then(() => {
         
-        // 2. Coba buka mailto: sebagai bantuan mengisi field 'Kepada'
-        const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.location.href = mailtoLink;
-
-        // 3. Berikan Instruksi Jelas
-        alert('✅ Template Email Berhasil Disalin!\n\n1. Aplikasi email Anda akan terbuka.\n2. Pastikan alamat tujuan sudah terisi.\n3. PASTE (Ctrl+V / Cmd+V) di kolom Subjek dan Isi Pesan.\n4. Lampirkan file secara manual jika diperlukan.');
+        // Kita HAPUS window.location.href = mailtoLink; 
+        // Alasan: Ini yang memicu pop-up gangguan di Edge/Windows. 
+        // Biarkan HR membuka email mereka sendiri (Gmail/Outlook) lalu Paste.
+        
+        alert('✅ Template Email Berhasil Disalin!\n\nSilakan buka Gmail/Outlook Anda, lalu:\n1. Klik "Compose" / "Buat Email Baru"\n2. PASTE (Ctrl+V) di kolom Subjek dan Isi Pesan.\n3. Lampirkan file secara manual jika diperlukan.');
         
       }).catch(err => {
         console.error('Gagal menyalin: ', err);
