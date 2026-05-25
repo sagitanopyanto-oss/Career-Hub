@@ -1,5 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { ArrowRight, Briefcase, CalendarDays, ChevronRight, Mail, MapPin, ShieldCheck, Sparkles, X, MessageCircle, EyeOff } from 'lucide-react';
+import { 
+  ArrowRight, Briefcase, CalendarDays, ChevronRight, Mail, MapPin, 
+  ShieldCheck, Sparkles, X, MessageCircle, EyeOff, CheckCircle2, 
+  DollarSign, Clock, FileText
+} from 'lucide-react';
 import { Job, AppSettings } from '../data/mockData';
 
 interface InfoPortalViewProps {
@@ -11,6 +15,11 @@ interface InfoPortalViewProps {
 export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, onOpenLoginModal }) => {
   const { infoPortal } = settings;
   const jobsSectionRef = useRef<HTMLDivElement | null>(null);
+  
+  // 🔹 STATE BARU: Untuk Modal Detail Lowongan
+  const [selectedJobDetail, setSelectedJobDetail] = useState<Job | null>(null);
+  
+  // State existing untuk Form Lamaran
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isApplying, setIsApplying] = useState(false);
 
@@ -56,12 +65,27 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
 
     console.log('Application Submitted:', appData);
     alert(`Terima kasih ${appNama}! Lamaran Anda untuk posisi ${selectedJob.judul} telah terkirim.`);
-    
+
     setIsApplying(false);
     setSelectedJob(null);
+    setSelectedJobDetail(null); // Tutup juga modal detail jika masih terbuka
     resetAppForm();
   };
 
+  // 🔹 FUNGSI BARU: Buka Modal Detail
+  const openJobDetail = (job: Job) => {
+    setSelectedJobDetail(job);
+  };
+
+  // 🔹 FUNGSI BARU: Dari Detail → Buka Form Lamaran
+  const startApplication = () => {
+    if (!selectedJobDetail) return;
+    setSelectedJob(selectedJobDetail);
+    setIsApplying(true);
+    resetAppForm();
+  };
+
+  // Fungsi existing (tetap dipertahankan untuk kompatibilitas)
   const openApplyForm = (job: Job) => {
     setSelectedJob(job);
     setIsApplying(true);
@@ -76,16 +100,16 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
 
   return (
     <div className="space-y-6">
+      {/* Hero Section - TETAP SAMA */}
       <section className="overflow-hidden rounded-3xl bg-slate-950 text-white shadow-2xl">
         <div className="grid min-h-[78vh] lg:grid-cols-[1.15fr_0.85fr]">
-           <div className="relative flex items-start pt-12 p-6 sm:p-8 md:p-12 lg:p-16">
-             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.25),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.18),_transparent_32%)]" />
-             <div className="relative max-w-2xl space-y-8">
-               {/* Top badge */}
-               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-xs font-bold text-white/90">
-                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                 CAREERHUB ATS v1.0
-               </div>
+          <div className="relative flex items-start pt-12 p-6 sm:p-8 md:p-12 lg:p-16">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.25),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.18),_transparent_32%)]" />
+            <div className="relative max-w-2xl space-y-8">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-xs font-bold text-white/90">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                CAREERHUB ATS v1.0
+              </div>
               <div className="space-y-5">
                 <div className="inline-flex flex-col sm:flex-row items-center gap-5 sm:gap-6 rounded-2xl border border-white/10 bg-white/5 px-5 py-5 sm:px-6 sm:py-6 shadow-xl backdrop-blur-sm">
                   {infoPortal.logoUrl ? (
@@ -110,22 +134,14 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
                   {infoPortal.heroSubtitle}
                 </p>
               </div>
-
               <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={scrollToJobs}
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-100"
-                >
+                <button onClick={scrollToJobs} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-100">
                   Lihat Lowongan <ArrowRight className="h-4 w-4" />
                 </button>
-                <button
-                  onClick={onOpenLoginModal}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/10"
-                >
+                <button onClick={onOpenLoginModal} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/10">
                   Masuk Dashboard HR <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-
               <div className="grid gap-3 pt-4 text-sm text-slate-300 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <ShieldCheck className="mb-3 h-5 w-5 text-emerald-300" />
@@ -152,7 +168,6 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
               <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5 shadow-xl backdrop-blur">
                 <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-slate-400 mb-5">Proses Rekrutmen</p>
                 <div className="relative">
-                  {/* Vertical connector line */}
                   <div className="absolute left-[15px] top-3 bottom-3 w-[2px] bg-gradient-to-b from-indigo-500 via-indigo-400/60 to-emerald-500" />
                   <div className="space-y-0">
                     {[
@@ -165,11 +180,9 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
                       { step: 'Hired', desc: 'Selamat bergabung!', color: 'bg-emerald-500', icon: '🎉' },
                     ].map((item, index) => (
                       <div key={item.step} className="relative flex items-start gap-4 pl-0 pb-4 last:pb-0 group">
-                        {/* Node dot */}
                         <div className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full ${item.color} text-white shadow-lg shrink-0 ring-4 ring-slate-950/60`}>
                           <span className="text-xs">{item.icon}</span>
                         </div>
-                        {/* Content */}
                         <div className="flex-1 min-w-0 pt-0.5">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">Step {index + 1}</span>
@@ -186,33 +199,21 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
 
               <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-slate-400">
-                  <CalendarDays className="h-4 w-4 text-indigo-300" />
-                  Kontak Rekrutmen
+                  <CalendarDays className="h-4 w-4 text-indigo-300" /> Kontak Rekrutmen
                 </div>
                 <div className="mt-4 space-y-3 text-sm text-slate-200">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-emerald-300" />
-                    <span>{infoPortal.contactEmail}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <MapPin className="h-4 w-4 text-amber-300" />
-                    <span>{infoPortal.contactLocation}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Briefcase className="h-4 w-4 text-indigo-300" />
-                    <span>{infoPortal.contactTeam}</span>
-                  </div>
+                  <div className="flex items-center gap-3"><Mail className="h-4 w-4 text-emerald-300" /><span>{infoPortal.contactEmail}</span></div>
+                  <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-amber-300" /><span>{infoPortal.contactLocation}</span></div>
+                  <div className="flex items-center gap-3"><Briefcase className="h-4 w-4 text-indigo-300" /><span>{infoPortal.contactTeam}</span></div>
                 </div>
               </div>
 
-              {/* Disclaimer Section */}
               <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 backdrop-blur">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
-                  <ShieldCheck className="h-4 w-4" />
-                  Peringatan Resmi
+                  <ShieldCheck className="h-4 w-4" /> Peringatan Resmi
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-slate-300 text-justify">
-                  Harap berhati-hati terhadap penipuan yang mengatasnamakan perusahaan. Kami hanya menggunakan kontak resmi sebagaimana tercantum di atas untuk seluruh keperluan komunikasi rekrutmen. Seluruh tahapan seleksi <span className="font-bold text-emerald-400">gratis/tanpa biaya</span>. Kami tidak bertanggung jawab atas undangan atau informasi yang berasal dari nomor, alamat, atau tautan yang tidak tercantum dalam situs resmi ini. Pastikan selalu mengacu pada informasi yang tertera di sini untuk menghindari hal-hal yang tidak diinginkan.
+                  Harap berhati-hati terhadap penipuan yang mengatasnamakan perusahaan. Kami hanya menggunakan kontak resmi sebagaimana tercantum di atas untuk seluruh keperluan komunikasi rekrutmen. Seluruh tahapan seleksi <span className="font-bold text-emerald-400">gratis/tanpa biaya</span>. Kami tidak bertanggung jawab atas undangan atau informasi yang berasal dari nomor, alamat, atau tautan yang tidak tercantum dalam situs resmi ini.
                 </p>
               </div>
             </div>
@@ -220,6 +221,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
         </div>
       </section>
 
+      {/* Jobs List Section - TETAP SAMA STRUKTURNYA, HANYA UBAH ONCLICK */}
       <section ref={jobsSectionRef} className="scroll-mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -234,7 +236,12 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
 
           <div className="divide-y divide-slate-100">
             {activeJobs.map((job) => (
-              <div key={job.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between group cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors" onClick={() => openApplyForm(job)}>
+              // 🔹 PERUBAHAN: onClick sekarang membuka DETAIL, bukan form lamaran
+              <div 
+                key={job.id} 
+                className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between group cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors" 
+                onClick={() => openJobDetail(job)}
+              >
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">{job.department}</p>
                   <h3 className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{job.judul}</h3>
@@ -251,8 +258,12 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
                       {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0, notation: 'compact' }).format(job.salaryMin)}
                     </span>
                   )}
-                  <button className="ml-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition-colors">
-                    Lamar
+                  {/* Tombol Lamar di kartu list tetap ada, tapi sekarang juga trigger detail dulu agar konsisten */}
+                  <button 
+                    className="ml-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition-colors"
+                    onClick={(e) => { e.stopPropagation(); openJobDetail(job); }}
+                  >
+                    Detail
                   </button>
                 </div>
               </div>
@@ -271,7 +282,6 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
             <h2 className="text-lg font-bold text-slate-800">Panduan Pelamar</h2>
             <p className="text-xs text-slate-500">Cara sederhana mengikuti proses di CareerHub.</p>
           </div>
-
           <div className="mt-4 space-y-3">
             {[
               'Pilih lowongan yang sesuai dengan profil dan skill Anda.',
@@ -286,19 +296,141 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
               </div>
             ))}
           </div>
-
-          <button
-            onClick={scrollToJobs}
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
-          >
+          <button onClick={scrollToJobs} className="mt-5 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
             Lihat Semua Lowongan <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </section>
 
-      {/* Application Form Modal */}
-      {isApplying && selectedJob && (
+      {/* 🔹 MODAL BARU: DETAIL LOWONGAN */}
+      {selectedJobDetail && !isApplying && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8 flex flex-col max-h-[90vh]">
+            {/* Header Detail */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+              <div className="flex justify-between items-start gap-4">
+                <div className="min-w-0">
+                  <span className="inline-block px-2 py-0.5 bg-indigo-500/30 text-indigo-200 rounded text-[10px] font-bold uppercase tracking-wider mb-2 border border-indigo-400/30">
+                    {selectedJobDetail.department}
+                  </span>
+                  <h3 className="font-extrabold text-xl sm:text-2xl leading-tight">{selectedJobDetail.judul}</h3>
+                  <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-slate-300">
+                    <span className="flex items-center gap-1"><Briefcase className="w-3.5 h-3.5" /> {selectedJobDetail.type}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Diposting: {selectedJobDetail.createdAt}</span>
+                    {selectedJobDetail.hideSalary ? (
+                      <span className="flex items-center gap-1 text-amber-300"><EyeOff className="w-3.5 h-3.5" /> Gaji Dirahasiakan</span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-emerald-300">
+                        <DollarSign className="w-3.5 h-3.5" /> 
+                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(selectedJobDetail.salaryMin)} - 
+                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(selectedJobDetail.salaryMax)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedJobDetail(null)}
+                  className="p-1.5 hover:bg-white/20 rounded-lg transition-colors shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body Detail - Scrollable */}
+            <div className="p-5 sm:p-6 space-y-6 overflow-y-auto flex-1">
+              
+              {/* Deskripsi */}
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-600" /> Deskripsi Pekerjaan
+                </h4>
+                <p className="text-xs leading-relaxed text-slate-600 whitespace-pre-line">{selectedJobDetail.description}</p>
+              </div>
+
+              {/* Tanggung Jawab */}
+              {selectedJobDetail.responsibilities && selectedJobDetail.responsibilities.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">Tanggung Jawab</h4>
+                  <ul className="space-y-1.5">
+                    {selectedJobDetail.responsibilities.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Kualifikasi */}
+              {selectedJobDetail.qualifications && selectedJobDetail.qualifications.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">Kualifikasi</h4>
+                  <ul className="space-y-1.5">
+                    {selectedJobDetail.qualifications.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Skills */}
+              {selectedJobDetail.skills && selectedJobDetail.skills.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">Keahlian Dibutuhkan</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedJobDetail.skills.map((skill, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold border border-slate-200">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Benefits */}
+              {selectedJobDetail.benefits && selectedJobDetail.benefits.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-2">Benefit</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedJobDetail.benefits.map((benefit, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-100">
+                        ✓ {benefit}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Detail - Tombol Lamar */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedJobDetail(null)}
+                className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100 transition-all"
+              >
+                Tutup
+              </button>
+              <button
+                type="button"
+                onClick={startApplication}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2"
+              >
+                Lamar Sekarang <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Application Form Modal - TETAP SAMA (Tidak Berubah) */}
+      {isApplying && selectedJob && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8 flex flex-col max-h-[90vh]">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-indigo-700 text-white">
               <div className="flex items-center gap-3 min-w-0">
@@ -333,8 +465,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
                     <label className="mb-1 block text-xs font-bold text-slate-600">Nomor Telepon <span className="text-red-500">*</span></label>
                     <input type="text" required value={appTelepon} onChange={(e) => setAppTelepon(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" placeholder="0812XXXXXXXX" />
                     <p className="text-[9px] text-orange-600 mt-1.5 flex items-center gap-1.5 font-semibold">
-                      <MessageCircle className="w-3 h-3 text-orange-500" />
-                      Pastikan nomor telepon terhubung dengan WhatsApp untuk proses konfirmasi
+                      <MessageCircle className="w-3 h-3 text-orange-500" /> Pastikan nomor telepon terhubung dengan WhatsApp
                     </p>
                   </div>
                   <div>
