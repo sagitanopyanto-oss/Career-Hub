@@ -1,18 +1,25 @@
 import React, { useRef, useState } from 'react';
-import { 
-  ArrowRight, Briefcase, CalendarDays, ChevronRight, Mail, MapPin, 
-  ShieldCheck, Sparkles, X, MessageCircle, EyeOff, CheckCircle2, 
+import {
+  ArrowRight, Briefcase, CalendarDays, ChevronRight, Mail, MapPin,
+  ShieldCheck, Sparkles, X, MessageCircle, EyeOff, CheckCircle2,
   DollarSign, Clock, FileText
 } from 'lucide-react';
-import { Job, AppSettings } from '../data/mockData';
+import { Job, AppSettings, Candidate } from '../data/mockData';
 
 interface InfoPortalViewProps {
   jobs: Job[];
   settings: AppSettings;
   onOpenLoginModal: () => void;
+  // 🔹 PROP BARU: Fungsi untuk menyimpan kandidat
+  onAddCandidate: (candidate: Candidate) => void;
 }
 
-export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, onOpenLoginModal }) => {
+export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
+  jobs,
+  settings,
+  onOpenLoginModal,
+  onAddCandidate // Destructure prop baru
+}) => {
   const { infoPortal } = settings;
   const jobsSectionRef = useRef<HTMLDivElement | null>(null);
   
@@ -49,26 +56,44 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({ jobs, settings, 
     setAppCvData(''); setAppCvName(''); setAppCoverLetter('');
   };
 
+  // 🔹 PERBAIKAN UTAMA: Fungsi handleApply sekarang menyimpan ke database
   const handleApply = (e: React.FormEvent) => {
     e.preventDefault();
     if (!appNama.trim() || !selectedJob) return;
 
-    const appData = {
-      nama: appNama, email: appEmail, telepon: appTelepon, gender: appGender,
-      tempatLahir: appTempatLahir, tanggalLahir: appTanggalLahir,
-      pendidikan: appPendidikan, jurusan: appJurusan, jabatan: appJabatan,
-      pengalaman: appPengalaman, statusKerja: appStatusKerja,
-      curSalary: appCurSalary, expSalary: appExpSalary,
-      cvName: appCvName, cvData: appCvData, coverLetter: appCoverLetter,
-      jobId: selectedJob.id, jobTitle: selectedJob.judul
+    // Mapping data form ke interface Candidate
+    const newCandidate: Candidate = {
+      id: `CAN-${Math.floor(100 + Math.random() * 900)}`,
+      nama: appNama,
+      telepon: appTelepon,
+      email: appEmail,
+      gender: appGender,
+      tempatLahir: appTempatLahir,
+      tanggalLahir: appTanggalLahir,
+      pendidikan: appPendidikan,
+      jurusan: appJurusan,
+      posisiDilamar: selectedJob.judul,
+      pengalaman: Number(appPengalaman),
+      statusPekerjaan: appStatusKerja,
+      jabatanTerakhir: appJabatan,
+      currentSalary: Number(appCurSalary),
+      expectedSalary: Number(appExpSalary),
+      tahapProses: 'applied',
+      ratingKecocokan: 0, // Akan dihitung otomatis oleh ATS di App.tsx
+      cvName: appCvName || 'CV_Resume.pdf',
+      cvDataUrl: appCvData || undefined,
+      cvMimeType: appCvData ? 'application/pdf' : undefined,
+      tanggalApplied: new Date().toISOString().split('T')[0],
+      keterangan: appCoverLetter || ''
     };
 
-    console.log('Application Submitted:', appData);
-    alert(`Terima kasih ${appNama}! Lamaran Anda untuk posisi ${selectedJob.judul} telah terkirim.`);
+    // 🔹 SIMPAN KE DATABASE (State Global)
+    onAddCandidate(newCandidate);
 
+    alert(`Terima kasih ${appNama}! Lamaran Anda untuk posisi ${selectedJob.judul} telah berhasil terkirim.`);
     setIsApplying(false);
     setSelectedJob(null);
-    setSelectedJobDetail(null); // Tutup juga modal detail jika masih terbuka
+    setSelectedJobDetail(null);
     resetAppForm();
   };
 
