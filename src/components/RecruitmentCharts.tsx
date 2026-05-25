@@ -114,17 +114,17 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
     return date >= bucket.start && date <= bucket.end ? 1 : 0;
   };
 
-  // 🔹 PERBAIKAN LOGIKA TREND: Hanya hitung kandidat HIRED berdasarkan tanggalHired
+  // 🔹 PERBAIKAN LOGIKA TREND: Hanya hitung lowongan BERSTATUS 'AKTIF'
   const trendPoints = buckets.map((bucket) => {
-    // Hitung lowongan baru berdasarkan createdAt
-    const jobsCount = jobs.reduce((sum, job) => sum + countInBucket(job.createdAt, bucket), 0);
+    // Hitung lowongan BARU yang BERSTATUS 'Aktif' berdasarkan createdAt
+    const jobsCount = jobs
+      .filter(job => job.status === 'Aktif') // Filter ketat: hanya lowongan aktif
+      .reduce((sum, job) => sum + countInBucket(job.createdAt, bucket), 0);
 
     // Hitung kandidat HIRED berdasarkan tanggalHired (BUKAN tanggalApplied)
     const hiredCount = candidates
       .filter(c => c.tahapProses === 'hired') // Filter ketat: hanya yang statusnya hired
       .reduce((sum, candidate) => {
-        // Gunakan tanggalHired. Jika kosong, countInBucket akan return 0.
-        // JANGAN fallback ke tanggalApplied agar kandidat belum hired tidak terhitung.
         return sum + countInBucket(candidate.tanggalHired, bucket);
       }, 0);
 
@@ -134,7 +134,7 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
       hired: hiredCount,
     };
   });
-
+  
   // 3. PIPELINE DATA
   const pipelineStages: { stage: string; label: string; count: number; color: string }[] = [
     { stage: 'applied', label: 'Applied', count: 0, color: 'bg-blue-500' },
