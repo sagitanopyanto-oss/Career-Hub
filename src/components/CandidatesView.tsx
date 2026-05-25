@@ -470,30 +470,28 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
         body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
       }
 
-      // Gunakan mailto: universal (mendukung Outlook, Thunderbird, Yahoo, Apple Mail, dll)
-      const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Siapkan teks lengkap untuk dicopy (Format standar email)
+      const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      if (isMobile) {
+      // 1. Copy ke Clipboard (Prioritas Utama)
+      navigator.clipboard.writeText(fullEmailText).then(() => {
+        
+        // 2. Coba buka mailto: sebagai bantuan mengisi field 'Kepada'
+        const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.location.href = mailtoLink;
-        const mobileEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(mobileEmailText).catch(() => {});
-        }
-        setTimeout(() => {
-          alert('📱 Mode Mobile Terdeteksi\n\n1. Jika aplikasi email tidak terbuka otomatis, silakan buka aplikasi email Anda secara manual.\n2. Template email & alamat tujuan sudah disalin ke clipboard.\n3. Paste di kolom "Kepada" & "Isi Pesan", lalu kirim.');
-        }, 300);
-      } else {
-        // Desktop: mailto: akan membuka default email client (Outlook, Thunderbird, dll)
-        window.location.href = mailtoLink;
-        alert(`Aplikasi email default Anda akan terbuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
-      }
+
+        // 3. Berikan Instruksi Jelas
+        alert('✅ Template Email Berhasil Disalin!\n\n1. Aplikasi email Anda akan terbuka.\n2. Pastikan alamat tujuan sudah terisi.\n3. PASTE (Ctrl+V / Cmd+V) di kolom Subjek dan Isi Pesan.\n4. Lampirkan file secara manual jika diperlukan.');
+        
+      }).catch(err => {
+        console.error('Gagal menyalin: ', err);
+        alert('⚠️ Gagal menyalin template otomatis. Silakan copy manual dari preview Subject & Body di atas, lalu paste ke email Anda.');
+      });
 
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
     };
-
+    
     const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files || files.length === 0) return;
