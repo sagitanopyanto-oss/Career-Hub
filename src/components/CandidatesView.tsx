@@ -515,7 +515,7 @@ startxref
           </div>
 
           {/* Footer */}
-          div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+          <div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
             {emailAttachments.length > 0 && (
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
                 <Paperclip className="w-3 h-3" />
