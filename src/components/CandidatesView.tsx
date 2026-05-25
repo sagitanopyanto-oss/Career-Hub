@@ -731,17 +731,17 @@ startxref
       // 2. Tambahkan info lampiran ke body email jika ada
       if (emailAttachments.length > 0) {
         const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
-        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: File fisik harus dilampirkan manual di klien email Anda)`;
+        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di jendela compose email Anda karena browser tidak mengizinkan pengiriman file otomatis demi keamanan.)`;
       }
 
-      // 3. Encode URI component agar karakter khusus aman di URL
+      // 3. Encode URI component agar karakter khusus (spasi, enter, simbol) aman di URL
       const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-      // 4. Buka Klien Email Default Pengguna
+      // 4. Buka Klien Email Default Pengguna (Outlook, Gmail App, Thunderbird, dll)
       window.location.href = mailtoLink;
 
       // 5. Feedback UI & Reset State
-      alert(`Klien email Anda akan terbuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
+      alert(`Aplikasi email default Anda akan terbuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
       
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
