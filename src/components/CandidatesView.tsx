@@ -464,30 +464,40 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const subject = replacedSubject;
       let body = replacedBody;
 
-      // Tambahkan info lampiran ke body email jika ada
       if (emailAttachments.length > 0) {
         const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
         body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di jendela compose email Anda)`;
       }
 
-      // Buat Link Gmail Compose Langsung
-      const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // Deteksi apakah user menggunakan perangkat mobile
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-      // Coba buka tab baru
-      const newWindow = window.open(gmailLink, '_blank');
+      if (isMobile) {
+        // MODE MOBILE: Coba buka mailto/gmail, tapi siapkan fallback copy clipboard
+        const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        // Coba buka tab/app
+        window.open(gmailLink, '_blank');
 
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        // JIKA POP-UP DIBLOKIR: Fallback ke Copy Clipboard + Instruksi Manual
+        // Siapkan teks untuk dicopy sebagai backup
         const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
         
         navigator.clipboard.writeText(fullEmailText).then(() => {
-          alert('⚠️ Pop-up Gmail diblokir oleh browser.\n\n✅ Template email & alamat tujuan SUDAH DISALIN ke clipboard.\n\nSilakan:\n1. Buka Gmail Anda secara manual.\n2. Klik "Compose" / "Buat Email Baru".\n3. PASTE (Ctrl+V) di kolom Subjek dan Isi Pesan.');
+          alert('📱 Mode Mobile Terdeteksi\n\n1. Aplikasi Email/Gmail seharusnya telah terbuka.\n2. Jika tidak, Template & Alamat Tujuan SUDAH DISALIN ke clipboard.\n3. Silakan Paste (Tempel) di kolom Subjek & Isi Pesan.');
         }).catch(() => {
-          alert('❌ Gagal menyalin template. Silakan copy manual dari preview Subject & Body di atas.');
+           alert('⚠️ Gagal menyalin template. Silakan copy manual dari preview di atas.');
         });
+
       } else {
-        // JIKA BERHASIL: Feedback sukses
-        alert(`✅ Tab Gmail telah dibuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
+        // MODE DESKTOP: Buka Tab Baru Gmail Langsung
+        const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        const newWindow = window.open(gmailLink, '_blank');
+
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+          alert('⚠️ Pop-up diblokir! Silakan izinkan pop-up untuk situs ini agar fitur email berfungsi.');
+        } else {
+          alert(`✅ Tab Gmail telah dibuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
+        }
       }
       
       setSelectedCandidateEmail(null);
