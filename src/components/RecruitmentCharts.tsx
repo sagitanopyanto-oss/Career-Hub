@@ -40,10 +40,16 @@ export const RecruitmentCharts: React.FC<ChartsProps> = ({
     return matchedJob?.department || 'Technology';
   };
 
-  // 1. DEPARTMENT DATA (Jobs vs Hired per Dept)
+  // 1. DEPARTMENT DATA (Jobs vs Hired per Dept) - FIXED LOGIC
   const deptData = departmentNames.map((department) => {
-    const jobsCount = jobs.filter((job) => job.department === department).length;
-    const hiredCount = candidates.filter((candidate) => candidate.tahapProses === 'hired' && resolveDepartment(candidate) === department).length;
+    // Hitung hanya lowongan BERSTATUS 'Aktif'
+    const jobsCount = jobs.filter((job) => 
+      job.department === department && job.status === 'Aktif' // Filter ketat: hanya lowongan aktif
+    ).length;
+
+    const hiredCount = candidates.filter((candidate) => 
+      candidate.tahapProses === 'hired' && resolveDepartment(candidate) === department
+    ).length;
 
     return {
       department,
