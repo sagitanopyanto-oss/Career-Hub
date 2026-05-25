@@ -515,16 +515,46 @@ startxref
           </div>
 
           {/* Footer */}
-          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-end">
+          div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+            {emailAttachments.length > 0 && (
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                <Paperclip className="w-3 h-3" />
+                <span>{emailAttachments.length} lampiran ({formatFileSize(emailAttachments.reduce((sum, f) => sum + f.size, 0))})</span>
+              </div>
+            )}
+            
+            {/* 🔹 TAMBAHAN UX: Tombol Salin Template (Fallback Mobile/Desktop) */}
             <button
-              onClick={() => setSelectedCandidateATS(null)}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all"
+              type="button"
+              onClick={async () => {
+                const textToCopy = `Kepada: ${cand.email}\nSubjek: ${replacedSubject}\n\n${replacedBody}`;
+                try {
+                  await navigator.clipboard.writeText(textToCopy);
+                  alert('✅ Template email & alamat tujuan berhasil disalin ke clipboard.');
+                } catch {
+                  alert('⚠️ Gagal menyalin. Silakan salin manual dari kolom Subject & Body di atas.');
+                }
+              }}
+              className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-100 transition-all flex items-center gap-1.5 self-start sm:self-auto"
             >
-              Tutup Analisis
+              📋 Salin Template Email
             </button>
+
+            <div className="flex justify-end gap-3 ml-auto">
+              <button
+                onClick={() => { setSelectedCandidateEmail(null); setEmailAttachments([]); }}
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSendEmail}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+              >
+                <Send className="w-4 h-4" /> Kirim Email
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
     );
   };
 
@@ -724,37 +754,37 @@ startxref
       .replace(/{telepon}/g, cand.telepon);
 
     const handleSendEmail = () => {
-      // 1. Siapkan variabel untuk template
       const subject = replacedSubject;
       let body = replacedBody;
 
-      // 2. Tambahkan info lampiran ke body email jika ada
       if (emailAttachments.length > 0) {
         const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
-        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di jendela compose email Anda)`;
+        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
       }
 
-      // 3. Encode URI component agar karakter khusus aman di URL
-      const encodedSubject = encodeURIComponent(subject);
-      const encodedBody = encodeURIComponent(body);
-      const recipient = cand.email;
+      const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-      // 4. Buat Link Gmail Compose Langsung
-      // Format: https://mail.google.com/mail/?view=cm&fs=1&to=EMAIL&su=SUBJECT&body=BODY
-      const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${encodedSubject}&body=${encodedBody}`;
+      if (isMobile) {
+        // Mobile: Coba buka mailto, tapi langsung siapkan fallback copy
+        window.location.href = mailtoLink;
+        
+        // Copy ke clipboard sebagai backup andal
+        const mobileEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(mobileEmailText).catch(() => {});
+        }
 
-      // 5. Buka Tab Baru Khusus Gmail
-      // Menggunakan window.open dengan '_blank' memastikan tab baru terbuka di browser yang sama
-      const newWindow = window.open(gmailLink, '_blank');
-
-      // 6. Fallback jika pop-up diblokir
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        alert('Pop-up diblokir oleh browser. Silakan izinkan pop-up untuk situs ini agar fitur email berfungsi.');
+        // Tampilkan panduan singkat (bisa pakai state modal atau alert ringan)
+        setTimeout(() => {
+          alert(`📱 Mode Mobile Terdeteksi\n\n1. Jika aplikasi email tidak terbuka otomatis, silakan buka aplikasi email Anda secara manual.\n2. Template email & alamat tujuan sudah disalin ke clipboard.\n3. Paste di kolom "Kepada" & "Isi Pesan", lalu kirim.`);
+        }, 300);
       } else {
-        // Feedback UI & Reset State
-        alert(`Tab Gmail telah dibuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
+        // Desktop: Perilaku normal
+        window.location.href = mailtoLink;
+        alert(`Aplikasi email default Anda akan terbuka untuk mengirim pesan ke ${cand.email}.`);
       }
-      
+
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
     };
