@@ -464,28 +464,39 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const subject = replacedSubject;
       let body = replacedBody;
 
-      // Tambahkan info lampiran ke body email jika ada
+      // Tambahkan info lampiran jika ada
       if (emailAttachments.length > 0) {
         const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
         body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
       }
 
-      // Siapkan teks lengkap untuk dicopy (Format standar email agar mudah paste)
-      const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
+      // Deteksi apakah user kemungkinan pakai Gmail di browser
+      const isLikelyGmailUser = 
+        window.location.hostname.includes('gmail.com') || 
+        document.referrer.includes('mail.google.com') ||
+        navigator.userAgent.toLowerCase().includes('chrome') && !navigator.userAgent.toLowerCase().includes('edg');
 
-      // Copy ke Clipboard
-      navigator.clipboard.writeText(fullEmailText).then(() => {
+      if (isLikelyGmailUser) {
+        // MODE 1: Buka Gmail Compose di tab baru (untuk pengguna Gmail web)
+        const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        const newWindow = window.open(gmailLink, '_blank');
         
-        // Kita HAPUS window.location.href = mailtoLink; 
-        // Alasan: Ini yang memicu pop-up gangguan di Edge/Windows. 
-        // Biarkan HR membuka email mereka sendiri (Gmail/Outlook) lalu Paste.
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+          alert('⚠️ Pop-up diblokir! Silakan izinkan pop-up untuk situs ini agar fitur email berfungsi.');
+        } else {
+          alert(`✅ Tab Gmail telah dibuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
+        }
+      } else {
+        // MODE 2: Copy template ke clipboard (untuk Outlook/Thunderbird/desktop mail)
+        const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
         
-        alert('✅ Template Email Berhasil Disalin!\n\nSilakan buka Gmail/Outlook Anda, lalu:\n1. Klik "Compose" / "Buat Email Baru"\n2. PASTE (Ctrl+V) di kolom Subjek dan Isi Pesan.\n3. Lampirkan file secara manual jika diperlukan.');
-        
-      }).catch(err => {
-        console.error('Gagal menyalin: ', err);
-        alert('⚠️ Gagal menyalin template otomatis. Silakan copy manual dari preview Subject & Body di atas, lalu paste ke email Anda.');
-      });
+        navigator.clipboard.writeText(fullEmailText).then(() => {
+          alert(`✅ Template Email Berhasil Disalin!\n\nSilakan buka aplikasi email desktop Anda (Outlook/Thunderbird), lalu:\n1. Buat email baru\n2. PASTE (Ctrl+V) di kolom Subjek dan Isi Pesan\n3. Lampirkan file secara manual jika diperlukan.`);
+        }).catch(err => {
+          console.error('Gagal menyalin: ', err);
+          alert('⚠️ Gagal menyalin template otomatis. Silakan copy manual dari preview Subject & Body di atas, lalu paste ke email Anda.');
+        });
+      }
 
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
