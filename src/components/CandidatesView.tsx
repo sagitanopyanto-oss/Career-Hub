@@ -724,12 +724,25 @@ startxref
       .replace(/{telepon}/g, cand.telepon);
 
     const handleSendEmail = () => {
-      // Simulate email sending - in real app would call API
-      const attachmentList = emailAttachments.length > 0 
-        ? `\nLampiran (${emailAttachments.length}):\n${emailAttachments.map(a => `  • ${a.name} (${formatFileSize(a.size)})`).join('\n')}`
-        : '\nLampiran: Tidak ada';
+      // 1. Siapkan variabel untuk template
+      const subject = replacedSubject;
+      let body = replacedBody;
+
+      // 2. Tambahkan info lampiran ke body email jika ada
+      if (emailAttachments.length > 0) {
+        const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
+        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: File fisik harus dilampirkan manual di klien email Anda)`;
+      }
+
+      // 3. Encode URI component agar karakter khusus aman di URL
+      const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      // 4. Buka Klien Email Default Pengguna
+      window.location.href = mailtoLink;
+
+      // 5. Feedback UI & Reset State
+      alert(`Klien email Anda akan terbuka untuk mengirim pesan ke ${cand.email}.\n\nPastikan Anda melampirkan file secara manual jika diperlukan.`);
       
-      alert(`Email berhasil dikirim ke ${cand.email}!\n\nDari: ${settings.emailSettings.senderName} <${settings.emailSettings.senderEmail}>\nKe: ${cand.email}\nTahap: ${emailStage}\nSubject: ${replacedSubject}${attachmentList}`);
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
     };
