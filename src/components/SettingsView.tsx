@@ -293,7 +293,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </button>
             </div>
           </div>
-        </2>
+        </div>
 
         {/* Card 1B: Sync Google Calendar */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 flex flex-col">
