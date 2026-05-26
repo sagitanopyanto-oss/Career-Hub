@@ -666,21 +666,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       </div>
 
-      {/* Budget Modal */}
+      {/* Budget Modal - WITH FREE YEAR INPUT */}
       {isBudgetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5 sm:p-6">
-              <div><h4 className="text-lg font-extrabold text-slate-800">Tambah Departemen + Tahun</h4><p className="text-xs text-slate-400">Buat alokasi budget untuk departemen baru pada tahun tertentu.</p></div>
-              <button type="button" onClick={() => { setNewDeptName(''); setNewDeptBudget(0); setIsBudgetModalOpen(false); }} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"><X className="w-5 h-5" /></button>
+              <div>
+                <h4 className="text-lg font-extrabold text-slate-800">Tambah Departemen + Tahun</h4>
+                <p className="text-xs text-slate-400">Buat alokasi budget untuk departemen baru pada tahun tertentu.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setNewDeptName(''); setNewDeptBudget(0); setIsBudgetModalOpen(false); }}
+                className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
+
             <form onSubmit={handleAddDeptBudget} className="space-y-4 p-5 sm:p-6">
-              <div><label className="mb-1 block text-xs font-bold text-slate-600">Nama Departemen</label><input type="text" required value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none" placeholder="Contoh: Finance" /></div>
-              
-              {/* 🔹 INFO TAHUN OTOMATIS SESUAI FILTER */}
-              <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-700">Tahun Anggaran:</span>
-                <span className="text-sm font-black text-indigo-800">{selectedBudgetYear}</span>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-600">Nama Departemen</label>
+                <input
+                  type="text"
+                  required
+                  value={newDeptName}
+                  onChange={(e) => setNewDeptName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
+                  placeholder="Contoh: Finance"
+                />
+              </div>
+
+              {/* 🔹 INPUT TAHUN BEBAS (BISA ISI TAHUN MENDATANG) */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-600">Tahun Anggaran</label>
+                <input
+                  type="number"
+                  min="2025"
+                  max="2100"
+                  required
+                  value={selectedBudgetYear}
+                  onChange={(e) => setSelectedBudgetYear(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="Contoh: 2028"
+                />
+                <p className="text-[9px] text-slate-400 mt-1">Masukkan tahun anggaran (2025–2100)</p>
               </div>
 
               <div>
@@ -701,9 +731,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   />
                 </div>
               </div>
+
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 mt-2">
-                <button type="button" onClick={() => { setNewDeptName(''); setNewDeptBudget(0); setIsBudgetModalOpen(false); }} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100">Batal</button>
-                <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700">Tambah</button>
+                <button
+                  type="button"
+                  onClick={() => { setNewDeptName(''); setNewDeptBudget(0); setIsBudgetModalOpen(false); }}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700"
+                >
+                  Tambah
+                </button>
               </div>
             </form>
           </div>
