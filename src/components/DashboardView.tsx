@@ -1,10 +1,7 @@
 import React, { useMemo } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
-} from 'recharts';
-import {
   Users, Briefcase, CheckCircle2, Clock, TrendingUp, DollarSign,
-  Filter, ChevronDown, CalendarDays
+  Filter, ChevronDown, CalendarDays, ArrowRight
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 
@@ -29,7 +26,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   setActiveMenu
 }) => {
 
-  // --- 1. FILTER LOGIC FOR CANDIDATES & JOBS (Existing Logic) ---
+  // --- 1. FILTER LOGIC FOR CANDIDATES & JOBS ---
   const filteredCandidates = useMemo(() => {
     return candidates.filter(cand => {
       const hiredDate = cand.tanggalHired ? new Date(cand.tanggalHired) : null;
@@ -46,8 +43,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
         rangeMatch = hiredDate >= sixMonthsAgo;
       }
-      // 'annual' matches any date in the selected filterYear
-
       return yearMatch && rangeMatch;
     });
   }, [candidates, filterYear, filterRange]);
@@ -86,9 +81,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       totalBudget += item.budget;
 
       // Calculate Actual Spend for this department in this year
-      // Sum of expectedSalary for candidates hired in this department in this year
+      // Simple matching: check if job title contains dept name or vice versa
       const deptActual = hiredInYear
-        .filter(c => c.posisiDilamar.includes(item.department) || item.department.includes(c.posisiDilamar)) // Simple matching logic
+        .filter(c => c.posisiDilamar.toLowerCase().includes(item.department.toLowerCase()) || item.department.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
         .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
       
       totalActual += deptActual;
@@ -124,7 +119,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       );
       
       const actualVal = hiredInYear
-        .filter(c => c.posisiDilamar.includes(filterDept) || filterDept.includes(c.posisiDilamar))
+        .filter(c => c.posisiDilamar.toLowerCase().includes(filterDept.toLowerCase()) || filterDept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
         .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
 
       return [
@@ -158,7 +153,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {filterYear}
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
-            {/* Simple Year Dropdown Implementation */}
             <select 
               value={filterYear} 
               onChange={(e) => setFilterYear(Number(e.target.value))}
@@ -260,7 +254,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Main Chart: Budget vs Actual */}
+        {/* Main Chart: Budget vs Actual (CSS ONLY - NO RECHARTS) */}
         <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -269,33 +263,72 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 11, fill: '#64748b' }} 
-                  tickFormatter={(val) => `${val / 1000000}jt`}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => formatRupiah(value)}
-                />
-                <Legend verticalAlign="top" height={36} iconType="circle" />
-                <Bar dataKey="Budget" name="Anggaran" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={40} />
-                <Bar dataKey="Actual" name="Realisasi" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-[300px] w-full flex flex-col justify-end pb-8 relative">
+            {/* Y-Axis Labels (Simple) */}
+            <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-[10px] text-slate-400 font-bold text-right pr-2">
+               <span>{formatRupiah(Math.max(budgetMetrics.totalBudget, budgetMetrics.totalActual))}</span>
+               <span>{formatRupiah(Math.max(budgetMetrics.totalBudget, budgetMetrics.totalActual) / 2)}</span>
+               <span>Rp 0</span>
+            </div>
+
+            {/* Chart Area */}
+            <div className="ml-12 h-full flex items-end justify-center gap-8 border-l border-b border-slate-200 pl-4 pb-0 relative">
+              
+              {/* Grid Lines */}
+              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                 <div className="border-t border-dashed border-slate-100 w-full h-0"></div>
+                 <div className="border-t border-dashed border-slate-100 w-full h-0"></div>
+                 <div className="border-t border-dashed border-slate-100 w-full h-0"></div>
+              </div>
+
+              {/* Bars */}
+              {chartData.map((data, i) => {
+                const maxVal = Math.max(data.Budget, data.Actual, 1); // Avoid divide by zero
+                const budgetHeight = (data.Budget / maxVal) * 100;
+                const actualHeight = (data.Actual / maxVal) * 100;
+
+                return (
+                  <div key={i} className="flex flex-col items-center gap-2 z-10 group relative">
+                    
+                    {/* Tooltip on Hover */}
+                    <div className="absolute -top-24 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
+                       <div className="font-bold mb-1">{data.name}</div>
+                       <div className="text-slate-300">Budget: {formatRupiah(data.Budget)}</div>
+                       <div className="text-emerald-300">Actual: {formatRupiah(data.Actual)}</div>
+                       <div className="text-blue-300">Sisa: {formatRupiah(data.Budget - data.Actual)}</div>
+                    </div>
+
+                    <div className="flex items-end gap-4 h-[200px]">
+                      {/* Budget Bar */}
+                      <div className="flex flex-col items-center gap-1">
+                         <div 
+                            className="w-12 bg-slate-300 rounded-t-md transition-all duration-500 hover:bg-slate-400 relative"
+                            style={{ height: `${budgetHeight}%` }}
+                         >
+                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-500">
+                              {data.Budget > 0 ? (data.Budget / 1000000).toFixed(1) + 'jt' : ''}
+                            </span>
+                         </div>
+                         <span className="text-[10px] font-bold text-slate-500">Budget</span>
+                      </div>
+
+                      {/* Actual Bar */}
+                      <div className="flex flex-col items-center gap-1">
+                         <div 
+                            className={`w-12 rounded-t-md transition-all duration-500 relative ${data.Actual > data.Budget ? 'bg-rose-500 hover:bg-rose-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                            style={{ height: `${actualHeight}%` }}
+                         >
+                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-500">
+                              {data.Actual > 0 ? (data.Actual / 1000000).toFixed(1) + 'jt' : ''}
+                            </span>
+                         </div>
+                         <span className="text-[10px] font-bold text-slate-500">Actual</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -320,8 +353,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                  )
               })}
            </div>
-           <button onClick={() => setActiveMenu('candidates')} className="mt-4 w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-colors">
-             Lihat Semua Kandidat
+           <button onClick={() => setActiveMenu('candidates')} className="mt-4 w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+             Lihat Semua Kandidat <ArrowRight className="w-3 h-3" />
            </button>
         </div>
 
