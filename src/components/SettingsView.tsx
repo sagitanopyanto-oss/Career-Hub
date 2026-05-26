@@ -31,16 +31,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [syncGoogleCalendar, setSyncGoogleCalendar] = useState(settings.syncGoogleCalendar);
   const [targetSlaDays, setTargetSlaDays] = useState<SlaSetting[]>([...settings.targetSlaDays]);
   const [targetSlaManagement, setTargetSlaManagement] = useState(settings.targetSlaManagement ?? 85);
-  
   // Department Budgets
   const [deptBudgets, setDeptBudgets] = useState(
     settings.budgetCostHiring.map(b => ({ ...b }))
   );
-
   const [adminRoles, setAdminRoles] = useState<AdminRole[]>(
     settings.adminRoles.map((role) => ({ ...role }))
   );
-
   const [infoPortal, setInfoPortal] = useState<AppSettings['infoPortal']>({ ...settings.infoPortal });
   const [emailSettings, setEmailSettings] = useState<AppSettings['emailSettings']>({
     ...settings.emailSettings,
@@ -57,10 +54,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [whatsappSettings, setWhatsappSettings] = useState<AppSettings['whatsappSettings']>({
     ...settings.whatsappSettings
   });
-
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveSection, setSaveSection] = useState('');
-  
+
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
@@ -84,7 +80,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSlaChange = (stage: string, val: number) => {
-    setTargetSlaDays(prev => 
+    setTargetSlaDays(prev =>
       prev.map(item => item.stage === stage ? { ...item, targetDays: Number(val) } : item)
     );
   };
@@ -115,7 +111,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     if (!newDeptName.trim()) return;
 
     const trimmedName = newDeptName.trim();
-    
+
     // Check if already exists
     if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase())) {
       alert("Departemen sudah ada!");
@@ -124,10 +120,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
     const newEntry = { department: trimmedName, budget: newDeptBudget, actual: 0 };
     const nextBudgets = [...deptBudgets, newEntry];
-    
+
     // Update local state
     setDeptBudgets(nextBudgets);
-    
+
     // Immediately broadcast to parent so charts / dashboard sync
     syncBudgetsToParent(nextBudgets);
 
@@ -172,8 +168,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     setRoleFormAccess(role.accessLevel);
     setRoleFormStatus(role.status);
     setRoleFormDescription(role.description);
-    setRoleFormPassword(role.password || '');
     setRoleFormPermissions({ ...role.permissions });
+    setRoleFormPassword(role.password || '');
     setShowPassword(false);
     setIsRoleModalOpen(true);
   };
@@ -211,7 +207,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   const handleSave = (e: React.FormEvent, section: string = 'Semua') => {
     e.preventDefault();
-    
     const updatedSettings: AppSettings = {
       autoScreeningATS,
       syncGoogleCalendar,
@@ -225,7 +220,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     };
 
     onUpdateSettings(updatedSettings);
-    
+
     setSaveSection(section);
     setSaveSuccess(true);
     setTimeout(() => {
@@ -240,9 +235,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-            <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" /> Pengaturan Rekrutmen & SLA
+            <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
+            Pengaturan Rekrutmen & SLA
           </h2>
-          <p className="text-slate-400 text-xs sm:text-sm">Sesuaikan ambang batas ATS, integrasi kalender, target SLA, dan budget cost hiring departemen.</p>
+          <p className="text-slate-400 text-xs sm:text-sm">
+            Sesuaikan ambang batas ATS, integrasi kalender, target SLA, dan budget cost hiring departemen.
+          </p>
         </div>
       </div>
 
@@ -254,7 +252,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        
         {/* Card 1: ATS Auto Screening */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 flex flex-col">
           <div className="space-y-6 flex-1">
@@ -269,7 +266,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               <div className="space-y-2 pt-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-semibold text-slate-600">Ambang Batas Kelulusan:</span>
-                  <span className="font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{autoScreeningATS}% Match</span>
+                  <span className="font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    {autoScreeningATS}% Match
+                  </span>
                 </div>
                 <input
                   type="range"
@@ -282,19 +281,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 />
               </div>
             </div>
-          </div>
 
-          {/* Save Button for Card 1 */}
-          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button
-              type="button"
-              onClick={(e) => handleSave(e, 'Skrining ATS')}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
-            >
-              <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
-            </button>
+            {/* Save Button for Card 1 */}
+            <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={(e) => handleSave(e, 'Skrining ATS')}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
+              >
+                <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
+              </button>
+            </div>
           </div>
-        </div>
+        </2>
 
         {/* Card 1B: Sync Google Calendar */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 flex flex-col">
@@ -324,20 +323,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 </button>
               </div>
             </div>
-          </div>
 
-          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button
-              type="button"
-              onClick={(e) => handleSave(e, 'Integrasi Kalender')}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
-            >
-              <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
-            </button>
+            {/* Save Button for Card 1B */}
+            <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={(e) => handleSave(e, 'Integrasi Kalender')}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
+              >
+                <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Card 2: Pengaturan Target SLA (Proses Rekrutmen) */}
+        {/* Card 2: Pengaturan Target SLA (Proses Rekrutmen) — ✅ PERUBAHAN DI SINI */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 flex flex-col">
           <div className="space-y-4 flex-1">
             <div className="flex items-center gap-2 text-slate-800 font-extrabold text-sm border-b border-slate-100 pb-2">
@@ -360,7 +360,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     max="30"
                     value={item.targetDays}
                     onChange={(e) => handleSlaChange(item.stage, Number(e.target.value))}
-                    className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700"
+                    className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               ))}
@@ -421,9 +421,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500 font-medium">Kategori Target:</span>
                   <span className={`font-bold px-2 py-0.5 rounded-md text-[10px] ${
-                    targetSlaManagement >= 90 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                    targetSlaManagement >= 75 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
-                    'bg-amber-50 text-amber-700 border border-amber-100'
+                    targetSlaManagement >= 90 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                      : targetSlaManagement >= 75 
+                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' 
+                        : 'bg-amber-50 text-amber-700 border border-amber-100'
                   }`}>
                     {targetSlaManagement >= 90 ? 'STRICT' : targetSlaManagement >= 75 ? 'STANDARD' : 'RELAXED'}
                   </span>
@@ -487,7 +489,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       className="text-rose-500 hover:text-rose-700 p-0.5 rounded hover:bg-rose-50 transition-colors"
                       title="Hapus Departemen"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <div className="relative">
@@ -496,7 +498,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       type="number"
                       value={dept.budget}
                       onChange={(e) => handleBudgetChange(dept.department, Number(e.target.value))}
-                      className="w-full text-xs font-bold pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700"
+                      className="w-full text-xs font-bold pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                 </div>
@@ -509,7 +511,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
 
-          {/* Save Button for Card 3 */}
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
             <button
               type="button"
@@ -543,10 +544,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     )}
                     <label className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-[10px] font-bold">
                       Upload
-                      <input 
-                        type="file" 
-                        accept="image/png, image/jpeg, image/svg+xml" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/svg+xml"
+                        className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
@@ -561,8 +562,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     </label>
                   </div>
                   {infoPortal.logoUrl && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setInfoPortal({ ...infoPortal, logoUrl: '' })}
                       className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold"
                     >
@@ -570,7 +571,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     </button>
                   )}
                 </div>
-                
+
                 <div className="flex-1 space-y-4">
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">Judul Hero Utama</label>
@@ -695,7 +696,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       </td>
                       <td className="p-4 text-slate-600">{role.accessLevel}</td>
                       <td className="p-4">
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${role.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                          role.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
                           {role.status}
                         </span>
                       </td>
@@ -756,7 +759,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Sender Configuration */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="md:col-span-2 flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <span className="text-xs font-bold text-slate-700">Aktifkan Email Otomatis:</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Aktifkan Email Otomatis:</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -805,7 +808,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Email Template Tabs */}
             <div className="pt-4 border-t border-slate-100">
               <label className="text-[11px] font-bold text-slate-600 block mb-2">Template Email Tahapan:</label>
-              <div className="flex gap-2 mb-3 flex-wrap">
+              <div className="flex flex-wrap gap-2 mb-3">
                 {(['interview', 'assessment', 'offering', 'medical', 'onboarding', 'rejected'] as const).map((stage) => (
                   <button
                     key={stage}
@@ -892,7 +895,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <span className="text-xs font-bold text-slate-700">Aktifkan WhatsApp Konfirmasi:</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Aktifkan WhatsApp Konfirmasi:</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -935,9 +938,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </button>
           </div>
         </div>
-
       </div>
 
+      {/* Budget Modal */}
       {isBudgetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -982,7 +985,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     min="0"
                     value={newDeptBudget}
                     onChange={(e) => setNewDeptBudget(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               </div>
@@ -1011,6 +1014,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       )}
 
+      {/* Role Modal */}
       {isRoleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -1083,38 +1087,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 />
               </div>
 
-              {/* Password Field */}
-              <div>
-                <label className="mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                  <Lock className="w-3.5 h-3.5 text-indigo-600" />
-                  Password Role {!editingRoleId && <span className="text-red-500">*</span>}
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required={!editingRoleId}
-                    value={roleFormPassword}
-                    onChange={(e) => setRoleFormPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 pr-10 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-                    placeholder={editingRoleId ? 'Kosongkan jika tidak diubah' : 'Masukkan password untuk role'}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    title={showPassword ? 'Sembunyikan' : 'Tampilkan'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[9px] text-slate-400 mt-1">
-                  {editingRoleId ? 'Biarkan kosong untuk mempertahankan password lama' : 'Password digunakan untuk login ke sistem CareerHub'}
-                </p>
-              </div>
-
-              {/* Granular Permissions Checkboxes */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <label className="mb-3 block text-[10px] font-black text-slate-500 uppercase tracking-widest">Akses & Izin (Permissions)</label>
+                <label className="mb-3 block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                  Akses & Izin (Permissions)
+                </label>
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4">
                   {[
                     { key: 'create', label: 'Create Data' },
@@ -1166,7 +1142,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         </div>
       )}
-
     </div>
   );
 };
