@@ -25,11 +25,11 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
   // STATE UNTUK MODAL DETAIL LOWONGAN
   const [selectedJobDetail, setSelectedJobDetail] = useState<Job | null>(null);
   
-  // STATE UNTUK FORM LAMARAN
+  // State existing untuk Form Lamaran
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   
-  // FORM STATE
+  // Applicant Form states
   const [appNama, setAppNama] = useState('');
   const [appEmail, setAppEmail] = useState('');
   const [appTelepon, setAppTelepon] = useState('');
@@ -39,10 +39,13 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
   const [appPendidikan, setAppPendidikan] = useState<'D3' | 'S1' | 'S2' | 'SMA/SMK'>('S1');
   const [appJurusan, setAppJurusan] = useState('');
   const [appJabatan, setAppJabatan] = useState('');
-  const [appPengalaman, setAppPengalaman] = useState(0);
+  
+  // 🔹 PERBAIKAN: Ubah state angka menjadi string kosong '' agar tidak tampil '0'
+  const [appPengalaman, setAppPengalaman] = useState('');
   const [appStatusKerja, setAppStatusKerja] = useState<'Aktif Bekerja' | 'Tidak Bekerja' | 'Fresh graduate'>('Tidak Bekerja');
-  const [appCurSalary, setAppCurSalary] = useState(0);
-  const [appExpSalary, setAppExpSalary] = useState(0);
+  const [appCurSalary, setAppCurSalary] = useState('');
+  const [appExpSalary, setAppExpSalary] = useState('');
+  
   const [appCvData, setAppCvData] = useState('');
   const [appCvName, setAppCvName] = useState('');
   const [appCoverLetter, setAppCoverLetter] = useState('');
@@ -50,15 +53,19 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
   const resetAppForm = () => {
     setAppNama(''); setAppEmail(''); setAppTelepon(''); setAppGender('Laki-laki');
     setAppTempatLahir(''); setAppTanggalLahir(''); setAppPendidikan('S1');
-    setAppJurusan(''); setAppJabatan(''); setAppPengalaman(0);
-    setAppStatusKerja('Tidak Bekerja'); setAppCurSalary(0); setAppExpSalary(0);
+    setAppJurusan(''); setAppJabatan(''); 
+    setAppPengalaman(''); // Reset ke string kosong
+    setAppStatusKerja('Tidak Bekerja'); 
+    setAppCurSalary(''); // Reset ke string kosong
+    setAppExpSalary(''); // Reset ke string kosong
     setAppCvData(''); setAppCvName(''); setAppCoverLetter('');
   };
 
   const handleApply = (e: React.FormEvent) => {
     e.preventDefault();
     if (!appNama.trim() || !selectedJob) return;
-    
+
+    // Mapping data form ke interface Candidate
     const newCandidate: Candidate = {
       id: `CAN-${Math.floor(100 + Math.random() * 900)}`,
       nama: appNama,
@@ -70,13 +77,14 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
       pendidikan: appPendidikan,
       jurusan: appJurusan,
       posisiDilamar: selectedJob.judul,
-      pengalaman: Number(appPengalaman),
+      // 🔹 PERBAIKAN: Konversi string ke Number, jika kosong jadi 0
+      pengalaman: Number(appPengalaman) || 0,
       statusPekerjaan: appStatusKerja,
       jabatanTerakhir: appJabatan,
-      currentSalary: Number(appCurSalary),
-      expectedSalary: Number(appExpSalary),
+      currentSalary: Number(appCurSalary) || 0,
+      expectedSalary: Number(appExpSalary) || 0,
       tahapProses: 'applied',
-      ratingKecocokan: 0,
+      ratingKecocokan: 0, // Akan dihitung otomatis oleh ATS di App.tsx
       cvName: appCvName || 'CV_Resume.pdf',
       cvDataUrl: appCvData || undefined,
       cvMimeType: appCvData ? 'application/pdf' : undefined,
@@ -84,7 +92,9 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
       keterangan: appCoverLetter || ''
     };
 
+    // SIMPAN KE DATABASE (State Global)
     onAddCandidate(newCandidate);
+
     alert(`Terima kasih ${appNama}! Lamaran Anda untuk posisi ${selectedJob.judul} telah berhasil terkirim.`);
     setIsApplying(false);
     setSelectedJob(null);
@@ -116,14 +126,14 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* HERO SECTION */}
+      {/* Hero Section - TETAP SAMA */}
       <section className="overflow-hidden rounded-3xl bg-slate-950 text-white shadow-2xl">
         <div className="grid min-h-[78vh] lg:grid-cols-[1.15fr_0.85fr]">
           <div className="relative flex items-start pt-12 p-6 sm:p-8 md:p-12 lg:p-16">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.25),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.18),_transparent_32%)]" />
             <div className="relative max-w-2xl space-y-8">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-xs font-bold text-white/90">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                 CAREERHUB ATS v1.0
               </div>
               <div className="space-y-5">
@@ -177,6 +187,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
               </div>
             </div>
           </div>
+
           <div className="relative border-t border-white/10 lg:border-l lg:border-t-0 bg-slate-900/70 p-6 sm:p-8 md:p-12 lg:p-16">
             <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(99,102,241,0.16),transparent_40%),linear-gradient(320deg,rgba(16,185,129,0.12),transparent_35%)]" />
             <div className="relative h-full space-y-6">
@@ -211,25 +222,18 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
                   </div>
                 </div>
               </div>
+
               <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-slate-400">
                   <CalendarDays className="h-4 w-4 text-indigo-300" /> Kontak Rekrutmen
                 </div>
                 <div className="mt-4 space-y-3 text-sm text-slate-200">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-emerald-300" />
-                    <span>{infoPortal.contactEmail}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <MapPin className="h-4 w-4 text-amber-300" />
-                    <span>{infoPortal.contactLocation}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Briefcase className="h-4 w-4 text-indigo-300" />
-                    <span>{infoPortal.contactTeam}</span>
-                  </div>
+                  <div className="flex items-center gap-3"><Mail className="h-4 w-4 text-emerald-300" /><span>{infoPortal.contactEmail}</span></div>
+                  <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-amber-300" /><span>{infoPortal.contactLocation}</span></div>
+                  <div className="flex items-center gap-3"><Briefcase className="h-4 w-4 text-indigo-300" /><span>{infoPortal.contactTeam}</span></div>
                 </div>
               </div>
+
               <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 backdrop-blur">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
                   <ShieldCheck className="h-4 w-4" /> Peringatan Resmi
@@ -243,7 +247,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
         </div>
       </section>
 
-      {/* JOBS LIST SECTION */}
+      {/* Jobs List Section */}
       <section ref={jobsSectionRef} className="scroll-mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -341,7 +345,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
                       <span className="flex items-center gap-1 text-amber-300"><EyeOff className="w-3.5 h-3.5" /> Gaji Dirahasiakan</span>
                     ) : (
                       <span className="flex items-center gap-1 text-emerald-300">
-                        <DollarSign className="w-3.5 h-3.5" />
+                        <DollarSign className="w-3.5 h-3.5" /> 
                         {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(selectedJobDetail.salaryMin)} - 
                         {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(selectedJobDetail.salaryMax)}
                       </span>
@@ -447,7 +451,7 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
         </div>
       )}
 
-      {/* APPLICATION FORM MODAL */}
+      {/* Application Form Modal */}
       {isApplying && selectedJob && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8 flex flex-col max-h-[90vh]">
@@ -474,81 +478,37 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Nama Lengkap <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={appNama} 
-                      onChange={(e) => setAppNama(e.target.value)} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
-                      placeholder="Contoh: Budi Santoso" 
-                    />
+                    <input type="text" required value={appNama} onChange={(e) => setAppNama(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" placeholder="Contoh: Budi Santoso" />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Email <span className="text-red-500">*</span></label>
-                    <input 
-                      type="email" 
-                      required 
-                      value={appEmail} 
-                      onChange={(e) => setAppEmail(e.target.value)} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
-                      placeholder="budi@email.com" 
-                    />
+                    <input type="email" required value={appEmail} onChange={(e) => setAppEmail(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" placeholder="budi@email.com" />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Nomor Telepon <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={appTelepon} 
-                      onChange={(e) => setAppTelepon(e.target.value)} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
-                      placeholder="0812XXXXXXXX" 
-                    />
+                    <input type="text" required value={appTelepon} onChange={(e) => setAppTelepon(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" placeholder="0812XXXXXXXX" />
                     <p className="text-[9px] text-orange-600 mt-1.5 flex items-center gap-1.5 font-semibold">
                       <MessageCircle className="w-3 h-3 text-orange-500" /> Pastikan nomor telepon terhubung dengan WhatsApp
                     </p>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Gender <span className="text-red-500">*</span></label>
-                    <select 
-                      required 
-                      value={appGender} 
-                      onChange={(e) => setAppGender(e.target.value as any)} 
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                    >
+                    <select required value={appGender} onChange={(e) => setAppGender(e.target.value as any)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
                       <option value="Laki-laki">Laki-laki</option>
                       <option value="Perempuan">Perempuan</option>
                     </select>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Tempat Lahir <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={appTempatLahir} 
-                      onChange={(e) => setAppTempatLahir(e.target.value)} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
-                      placeholder="Contoh: Jakarta" 
-                    />
+                    <input type="text" required value={appTempatLahir} onChange={(e) => setAppTempatLahir(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" placeholder="Contoh: Jakarta" />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Tanggal Lahir <span className="text-red-500">*</span></label>
-                    <input 
-                      type="date" 
-                      required 
-                      value={appTanggalLahir} 
-                      onChange={(e) => setAppTanggalLahir(e.target.value)} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
-                    />
+                    <input type="date" required value={appTanggalLahir} onChange={(e) => setAppTanggalLahir(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Pendidikan Terakhir <span className="text-red-500">*</span></label>
-                    <select 
-                      required 
-                      value={appPendidikan} 
-                      onChange={(e) => setAppPendidikan(e.target.value as any)} 
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                    >
+                    <select required value={appPendidikan} onChange={(e) => setAppPendidikan(e.target.value as any)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
                       <option value="SMA/SMK">SMA/SMK</option>
                       <option value="D3">D3</option>
                       <option value="S1">S1</option>
@@ -557,26 +517,14 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Jurusan <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={appJurusan} 
-                      onChange={(e) => setAppJurusan(e.target.value)} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
-                      placeholder="Teknik Informatika" 
-                    />
+                    <input type="text" required value={appJurusan} onChange={(e) => setAppJurusan(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" placeholder="Teknik Informatika" />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Jabatan Terakhir <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={appJabatan} 
-                      onChange={(e) => setAppJabatan(e.target.value)} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
-                      placeholder="Frontend Developer" 
-                    />
+                    <input type="text" required value={appJabatan} onChange={(e) => setAppJabatan(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" placeholder="Frontend Developer" />
                   </div>
+                  
+                  {/* 🔹 PERBAIKAN INPUT ANGKA: Hilangkan Spinner & Tambah Placeholder */}
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Pengalaman (Tahun) <span className="text-red-500">*</span></label>
                     <input 
@@ -584,23 +532,21 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
                       required 
                       min="0" 
                       value={appPengalaman} 
-                      onChange={(e) => setAppPengalaman(Number(e.target.value))} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
+                      onChange={(e) => setAppPengalaman(e.target.value)} 
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                      placeholder="Contoh: 2"
                     />
                   </div>
+                  
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Status Pekerjaan <span className="text-red-500">*</span></label>
-                    <select 
-                      required 
-                      value={appStatusKerja} 
-                      onChange={(e) => setAppStatusKerja(e.target.value as any)} 
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                    >
+                    <select required value={appStatusKerja} onChange={(e) => setAppStatusKerja(e.target.value as any)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
                       <option value="Aktif Bekerja">Aktif Bekerja</option>
                       <option value="Tidak Bekerja">Tidak Bekerja</option>
                       <option value="Fresh graduate">Fresh Graduate</option>
                     </select>
                   </div>
+                  
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Gaji Saat Ini <span className="text-red-500">*</span></label>
                     <input 
@@ -608,10 +554,12 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
                       required 
                       min="0" 
                       value={appCurSalary} 
-                      onChange={(e) => setAppCurSalary(Number(e.target.value))} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
+                      onChange={(e) => setAppCurSalary(e.target.value)} 
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                      placeholder="Contoh: 5000000"
                     />
                   </div>
+                  
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Ekspektasi Gaji <span className="text-red-500">*</span></label>
                     <input 
@@ -619,27 +567,23 @@ export const InfoPortalView: React.FC<InfoPortalViewProps> = ({
                       required 
                       min="0" 
                       value={appExpSalary} 
-                      onChange={(e) => setAppExpSalary(Number(e.target.value))} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700" 
+                      onChange={(e) => setAppExpSalary(e.target.value)} 
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                      placeholder="Contoh: 8000000"
                     />
                   </div>
+
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-600">Upload CV <span className="text-red-500">*</span></label>
-                    <input 
-                      type="file" 
-                      required 
-                      accept=".pdf,.doc,.docx" 
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setAppCvName(file.name);
-                          const reader = new FileReader();
-                          reader.onloadend = () => setAppCvData(reader.result as string);
-                          reader.readAsDataURL(file);
-                        }
-                      }} 
-                      className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-semibold text-slate-700 bg-white" 
-                    />
+                    <input type="file" required accept=".pdf,.doc,.docx" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setAppCvName(file.name);
+                        const reader = new FileReader();
+                        reader.onloadend = () => setAppCvData(reader.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }} className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-semibold text-slate-700 bg-white" />
                     {appCvName && <p className="text-[10px] text-emerald-600 mt-1 font-bold">✓ {appCvName}</p>}
                   </div>
                   <div className="sm:col-span-2">
