@@ -41,8 +41,8 @@ export default function App() {
 
   // Filter range state ('month' | '6months' | 'annual')
   const [filterRange, setFilterRange] = useState<'month' | '6months' | 'annual'>('6months');
-  // Ubah default tahun ke 2025 agar data sample langsung terlihat
-  const [filterYear, setFilterYear] = useState<number>(2025); 
+  // Filter year (e.g. 2025, 2026) — 0 means "all years"
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
   // Filter quarter — empty array means "all quarters"
   const [filterQuarters, setFilterQuarters] = useState<number[]>([]);
 
