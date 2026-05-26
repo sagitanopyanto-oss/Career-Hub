@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Users, Briefcase, UserCheck, Stethoscope, FileCheck, Activity,
   CalendarClock, Clock, ArrowUpRight, TrendingUp, Award, CheckCircle,
-  DollarSign, AlertTriangle, X, ChevronDown, CalendarDays
+  DollarSign, AlertTriangle, X
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 import { RecruitmentCharts } from './RecruitmentCharts';
@@ -390,7 +390,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         filterQuarters={filterQuarters}
       />
 
-      {/* 🔹 COST HIRING CLUSTER BAR CHART SECTION */}
+      {/* 🔹 COST HIRING CLUSTER BAR CHART SECTION - REVISED */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
           <div>
@@ -446,15 +446,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     {/* Cluster Bars Container */}
                     <div className="flex items-end gap-2 sm:gap-4 w-full justify-center h-full px-2">
-                      {/* Budget Bar */}
-                      <div className="relative flex flex-col items-center justify-end h-full w-1/2">
+                      {/* Budget Bar - Clickable for Detail */}
+                      <div 
+                        className="relative flex flex-col items-center justify-end h-full w-1/2 cursor-pointer hover:opacity-90"
+                        onClick={() => setSelectedDetailYear(item.year)}
+                        title="Klik untuk lihat detail"
+                      >
                         <div
                           className="w-full max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500"
                           style={{ height: `${Math.max(budgetHeight, 0.5)}%` }}
                         ></div>
                       </div>
-                      {/* Actual Bar */}
-                      <div className="relative flex flex-col items-center justify-end h-full w-1/2">
+                      {/* Actual Bar - Clickable for Detail */}
+                      <div 
+                        className="relative flex flex-col items-center justify-end h-full w-1/2 cursor-pointer hover:opacity-90"
+                        onClick={() => setSelectedDetailYear(item.year)}
+                        title="Klik untuk lihat detail"
+                      >
                         <div
                           className={`w-full max-w-[40px] rounded-t-md transition-all duration-500 ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
                           style={{ height: `${Math.max(actualHeight, 0.5)}%` }}
@@ -462,58 +470,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
 
-                    {/* X-Axis Label */}
-                    <div className="text-center mt-2">
+                    {/* X-Axis Label with Optional Detail Button */}
+                    <div className="text-center mt-2 flex flex-col items-center gap-1">
                       <span className="text-xs font-bold text-slate-600">{item.year}</span>
+                      {/* Optional: Small button to trigger detail if user doesn't click bar */}
+                      <button
+                        onClick={() => setSelectedDetailYear(item.year)}
+                        className="text-[9px] text-indigo-600 hover:text-indigo-800 underline hidden sm:block"
+                      >
+                        Detail
+                      </button>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* SUMMARY TABLE BELOW CHART */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-2 text-left">TAHUN</th>
-                    <th className="py-2 text-center">STATUS</th>
-                    <th className="py-2 text-right">AKSI</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredCostData.map((item) => {
-                    const isOver = item.actual > item.budget && item.budget > 0;
-                    return (
-                      <tr key={item.year} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 font-bold text-slate-700">{item.year}</td>
-                        <td className="py-3 text-center">
-                          {item.budget === 0 && item.actual === 0 ? (
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-bold">No Data</span>
-                          ) : isOver ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full text-[9px] font-bold border border-rose-100">
-                              <AlertTriangle className="w-3 h-3" /> Over Budget
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[9px] font-bold border border-emerald-100">
-                              <CheckCircle className="w-3 h-3" /> On Budget
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 text-right">
-                          <button
-                            onClick={() => setSelectedDetailYear(item.year)}
-                            className="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold underline"
-                          >
-                            Lihat Detail
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {/* NO TABLE HERE ANYMORE - REMOVED AS REQUESTED */}
           </div>
         ) : (
           <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
