@@ -104,33 +104,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   };
 
   const handleAddDeptBudget = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDeptName.trim()) return;
-    const trimmedName = newDeptName.trim();
-    
-    // Cek duplikat per kombinasi department + year
-    if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase() && d.year === selectedBudgetYear)) {
-      alert(`Departemen "${trimmedName}" sudah ada untuk tahun ${selectedBudgetYear}!`);
-      return;
-    }
+  e.preventDefault();
+  if (!newDeptName.trim()) return;
+  const trimmedName = newDeptName.trim();
+  
+  // Cek duplikat per kombinasi department + year (gunakan newDeptYear)
+  if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase() && d.year === newDeptYear)) {
+    alert(`Departemen "${trimmedName}" sudah ada untuk tahun ${newDeptYear}!`);
+    return;
+  }
 
-    const newEntry = { 
-      department: trimmedName, 
-      year: selectedBudgetYear, 
-      budget: newDeptBudget, 
-      actual: 0 
-    };
-    const nextBudgets = [...deptBudgets, newEntry];
-    setDeptBudgets(nextBudgets);
-    syncBudgetsToParent(nextBudgets);
-    setNewDeptName('');
-    setNewDeptBudget(0);
-    setIsBudgetModalOpen(false);
-    setSaveSection('Departemen Baru');
-    setSaveSuccess(true);
-    setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
+  const newEntry = { 
+    department: trimmedName, 
+    year: newDeptYear, // Gunakan newDeptYear
+    budget: newDeptBudget, 
+    actual: 0 
   };
-
+  
+  const nextBudgets = [...deptBudgets, newEntry];
+  setDeptBudgets(nextBudgets);
+  syncBudgetsToParent(nextBudgets);
+  
+  setNewDeptName('');
+  setNewDeptYear(2025); // Reset ke default
+  setNewDeptBudget(0);
+  setIsBudgetModalOpen(false);
+  
+  setSaveSection('Departemen Baru');
+  setSaveSuccess(true);
+  setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
+};
   const handleRemoveDeptBudget = (deptName: string) => {
     const nextBudgets = deptBudgets.filter(d => d.department !== deptName);
     setDeptBudgets(nextBudgets);
@@ -666,7 +669,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       </div>
 
-      {/* Budget Modal - WITH FREE YEAR INPUT */}
+      {/* Budget Modal - WITH FREE YEAR INPUT & ANTI-LEADING-ZERO */}
       {isBudgetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -677,7 +680,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </div>
               <button
                 type="button"
-                onClick={() => { setNewDeptName(''); setNewDeptBudget(0); setIsBudgetModalOpen(false); }}
+                onClick={() => { setNewDeptName(''); setNewDeptYear(2025); setNewDeptBudget(0); setIsBudgetModalOpen(false); }}
                 className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"
               >
                 <X className="w-5 h-5" />
@@ -697,20 +700,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 />
               </div>
 
-              {/* 🔹 INPUT TAHUN BEBAS (BISA ISI TAHUN MENDATANG) */}
+              {/* 🔹 PERBAIKAN UTAMA: Input Tahun dengan Anti-Leading-Zero */}
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-600">Tahun Anggaran</label>
                 <input
-                  type="number"
-                  min="2025"
-                  max="2100"
+                  type="text" // Ubah dari "number" ke "text"
+                  inputMode="numeric" // Tetap memunculkan keyboard angka di HP
                   required
-                  value={selectedBudgetYear}
-                  onChange={(e) => setSelectedBudgetYear(Number(e.target.value))}
+                  value={newDeptYear === 0 ? '' : newDeptYear.toString()}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^\d]/g, ''); // Hanya izinkan angka
+                    // Hilangkan leading zero: jika dimulai dengan '0' dan panjang > 1, hapus '0' di depan
+                    let cleanVal = val;
+                    if (cleanVal.startsWith('0') && cleanVal.length > 1) {
+                      cleanVal = cleanVal.replace(/^0+/, '');
+                    }
+                    // Konversi ke number, jika kosong jadi 0
+                    const numVal = cleanVal === '' ? 0 : Number(cleanVal);
+                    setNewDeptYear(numVal);
+                  }}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="Contoh: 2028"
+                  placeholder="Contoh: 2026"
                 />
-                <p className="text-[9px] text-slate-400 mt-1">Masukkan tahun anggaran (2025–2100)</p>
+                <p className="text-[9px] text-slate-400 mt-1">Masukkan tahun anggaran (misal: 2025, 2026, dst)</p>
               </div>
 
               <div>
@@ -735,7 +747,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 mt-2">
                 <button
                   type="button"
-                  onClick={() => { setNewDeptName(''); setNewDeptBudget(0); setIsBudgetModalOpen(false); }}
+                  onClick={() => { setNewDeptName(''); setNewDeptYear(2025); setNewDeptBudget(0); setIsBudgetModalOpen(false); }}
                   className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
                 >
                   Batal
