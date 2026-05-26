@@ -15,13 +15,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [autoScreeningATS, setAutoScreeningATS] = useState(settings.autoScreeningATS);
   const [syncGoogleCalendar, setSyncGoogleCalendar] = useState(settings.syncGoogleCalendar);
   
-  // 🔹 DEFAULT 0: State awal di-set ke 0 jika data kosong
-  const [targetSlaDays, setTargetSlaDays] = useState<SlaSetting[]>(
-    settings.targetSlaDays.map(item => ({ ...item, targetDays: item.targetDays || 0 }))
-  );
+  // 🔹 MIGRASI DATA LAMA: Jika budget tidak punya year, asumsikan 2025
+  const [targetSlaDays, setTargetSlaDays] = useState<SlaSetting[]>([...settings.targetSlaDays]);
   const [targetSlaManagement, setTargetSlaManagement] = useState(settings.targetSlaManagement ?? 85);
   
-  // 🔹 MIGRASI DATA LAMA: Jika budget tidak punya year, asumsikan 2025
   const [deptBudgets, setDeptBudgets] = useState(
     settings.budgetCostHiring.map(b => ({ 
       ...b, 
@@ -82,11 +79,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     return cleaned;
   };
 
-  // 🔹 HANDLER SLA: Simpan sebagai string sementara, konversi saat save
-  const handleSlaChange = (stage: string, rawValue: string) => {
-    const sanitized = sanitizeNumberInput(rawValue);
+  // 🔹 HANDLER SLA
+  const handleSlaChange = (stage: string, val: number) => {
     setTargetSlaDays(prev =>
-      prev.map(item => item.stage === stage ? { ...item, targetDays: sanitized === '' ? 0 : Number(sanitized) } : item)
+      prev.map(item => item.stage === stage ? { ...item, targetDays: Number(val) } : item)
     );
   };
 
@@ -118,7 +114,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       return;
     }
 
-    const newEntry = { department: trimmedName, year: selectedBudgetYear, budget: newDeptBudget, actual: 0 };
+    const newEntry = { 
+      department: trimmedName, 
+      year: selectedBudgetYear, 
+      budget: newDeptBudget, 
+      actual: 0 
+    };
     const nextBudgets = [...deptBudgets, newEntry];
     setDeptBudgets(nextBudgets);
     syncBudgetsToParent(nextBudgets);
@@ -130,8 +131,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
   };
 
-  const handleRemoveDeptBudget = (deptName: string, year: number) => {
-    const nextBudgets = deptBudgets.filter(d => !(d.department === deptName && d.year === year));
+  const handleRemoveDeptBudget = (deptName: string) => {
+    const nextBudgets = deptBudgets.filter(d => d.department !== deptName);
     setDeptBudgets(nextBudgets);
     syncBudgetsToParent(nextBudgets);
   };
@@ -171,17 +172,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   const deleteRole = (id: string) => setAdminRoles((prev) => prev.filter((item) => item.id !== id));
 
-  // 🔹 VALIDASI BISNIS OPSIONAL: Cek saat save, bukan saat ketik
   const handleSave = (e: React.FormEvent, section: string = 'Semua') => {
     e.preventDefault();
-    
-    // Validasi SLA: tidak boleh < 1 hari
-    const invalidSla = targetSlaDays.find(item => item.targetDays < 1);
-    if (invalidSla) {
-      alert(`⚠️ Target SLA tahap "${invalidSla.stage}" tidak boleh kurang dari 1 hari.`);
-      return;
-    }
-
     const updatedSettings: AppSettings = {
       autoScreeningATS, syncGoogleCalendar, targetSlaDays, targetSlaManagement,
       budgetCostHiring: deptBudgets, adminRoles, infoPortal, emailSettings, whatsappSettings
@@ -194,9 +186,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   // 🔹 CLASS CSS UNTUK INPUT ANGKA TANPA SPINNER
   const numberInputClass = "w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
-
-  // Filter budget berdasarkan tahun terpilih
-  const filteredBudgets = deptBudgets.filter(b => b.year === selectedBudgetYear);
   const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
   return (
@@ -295,7 +284,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     type="text"
                     inputMode="numeric"
                     value={item.targetDays === 0 ? '' : item.targetDays.toString()}
-                    onChange={(e) => handleSlaChange(item.stage, e.target.value)}
+                    onChange={(e) => handleSlaChange(item.stage, Number(e.target.value))}
                     placeholder="0"
                     className={numberInputClass}
                   />
@@ -351,13 +340,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         </div>
 
-        {/* Card 3: Budget Cost Hiring per Department (FORMAT TABEL) */}
+        {/* Card 3: Budget Cost Hiring per Department - MULTI-YEAR TABLE */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 lg:col-span-2 flex flex-col">
           <div className="space-y-4 flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2 text-slate-800 font-extrabold text-sm">
                 <DollarSign className="w-4 h-4 text-indigo-600" />
-                <h3>Budget Cost Hiring per Departemen (IDR)</h3>
+                <h3>Budget Cost Hiring per Departemen (Multi-Tahun)</h3>
               </div>
               
               <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -376,7 +365,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 </div>
 
                 <button type="button" onClick={() => setIsBudgetModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100">
-                  <Plus className="w-3.5 h-3.5" /> Tambah Departemen
+                  <Plus className="w-3.5 h-3.5" /> Tambah Departemen + Tahun
                 </button>
               </div>
             </div>
@@ -384,65 +373,184 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               Atur batas budget tahunan untuk perekrutan per divisi. CareerHub akan memantau pengeluaran aktual berdasarkan expected salary kandidat hired.
             </p>
 
-            {/* 🔹 FORMAT TABEL BUDGET */}
+            {/* 🔹 TABEL MULTI-TAHUN SESUAI GAMBAR */}
             <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full min-w-[1200px] text-left text-xs border-collapse">
                 <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider">
                   <tr>
-                    <th className="p-3 border-b border-slate-200 font-bold">Departemen</th>
-                    <th className="p-3 border-b border-slate-200 font-bold text-center">Tahun</th>
-                    <th className="p-3 border-b border-slate-200 font-bold">Budget (IDR)</th>
-                    <th className="p-3 border-b border-slate-200 font-bold">Actual (IDR)</th>
-                    <th className="p-3 border-b border-slate-200 font-bold">Sisa Budget</th>
-                    <th className="p-3 border-b border-slate-200 font-bold text-center">Aksi</th>
+                    <th rowSpan={2} className="p-3 border-b border-r border-slate-200 font-bold w-12 text-center">No</th>
+                    <th rowSpan={2} className="p-3 border-b border-r border-slate-200 font-bold">Departemen</th>
+                    
+                    {/* Header Tahun 2025 */}
+                    <th colSpan={3} className="p-2 border-b border-r border-slate-200 font-bold text-center bg-indigo-50/50">2025</th>
+                    
+                    {/* Header Tahun 2026 */}
+                    <th colSpan={3} className="p-2 border-b border-r border-slate-200 font-bold text-center bg-indigo-50/50">2026</th>
+                    
+                    {/* Header Tahun 2027 */}
+                    <th colSpan={3} className="p-2 border-b border-r border-slate-200 font-bold text-center bg-indigo-50/50">2027</th>
+                    
+                    <th rowSpan={2} className="p-3 border-b border-slate-200 font-bold text-center w-24">Aksi</th>
+                  </tr>
+                  <tr>
+                    {/* Sub-header 2025 */}
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Budget</th>
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Actual</th>
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Sisa</th>
+                    
+                    {/* Sub-header 2026 */}
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Budget</th>
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Actual</th>
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Sisa</th>
+                    
+                    {/* Sub-header 2027 */}
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Budget</th>
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Actual</th>
+                    <th className="p-2 border-b border-r border-slate-200 font-semibold text-center">Sisa</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredBudgets.length > 0 ? filteredBudgets.map((dept) => {
-                    const remaining = dept.budget - dept.actual;
-                    return (
-                      <tr key={`${dept.department}-${dept.year}`} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="p-3 font-bold text-slate-800">{dept.department}</td>
-                        <td className="p-3 text-center text-slate-600">{dept.year}</td>
-                        <td className="p-3">
-                          <div className="relative">
-                            <span className="absolute left-2.5 top-2 text-[10px] text-slate-400 font-bold">Rp</span>
+                  {deptBudgets.length > 0 ? (
+                    // Group by department name, then show all years in one row
+                    Array.from(
+                      new Set(deptBudgets.map(b => b.department))
+                    ).map((deptName, index) => {
+                      const budgetsByYear = deptBudgets.filter(b => b.department === deptName);
+                      
+                      // Helper to get budget for specific year
+                      const getBudgetForYear = (year: number) => 
+                        budgetsByYear.find(b => b.year === year) || { department: deptName, year, budget: 0, actual: 0 };
+
+                      return (
+                        <tr key={deptName} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-3 text-center font-medium text-slate-500 align-middle border-r border-slate-100">{index + 1}</td>
+                          <td className="p-3 font-bold text-slate-800 align-middle border-r border-slate-100">{deptName}</td>
+                          
+                          {/* 2025 Columns */}
+                          <td className="p-2 border-r border-slate-100 align-middle">
                             <input
                               type="text"
                               inputMode="numeric"
-                              value={dept.budget === 0 ? '' : dept.budget.toString()}
-                              onChange={(e) => handleBudgetChange(dept.department, dept.year, e.target.value)}
+                              value={getBudgetForYear(2025).budget === 0 ? '' : getBudgetForYear(2025).budget.toString()}
+                              onChange={(e) => {
+                                const val = sanitizeNumberInput(e.target.value);
+                                const numVal = val === '' ? 0 : Number(val);
+                                setDeptBudgets(prev => 
+                                  prev.map(item => 
+                                    item.department === deptName && item.year === 2025 
+                                      ? { ...item, budget: numVal } 
+                                      : item
+                                  )
+                                );
+                              }}
                               placeholder="0"
-                              className={`${numberInputClass} pl-7 font-bold`}
+                              className="w-full text-center text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
-                          </div>
-                        </td>
-                        <td className="p-3 text-slate-600 font-medium">{formatRupiah(dept.actual)}</td>
-                        <td className="p-3">
-                          <span className={`font-bold ${remaining < 0 ? 'text-rose-600' : remaining < dept.budget * 0.2 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {formatRupiah(remaining)}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm(`Hapus budget untuk departemen ${dept.department} tahun ${dept.year}?`)) {
-                                handleRemoveDeptBudget(dept.department, dept.year);
-                              }
-                            }}
-                            className="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50 transition-colors"
-                            title="Hapus Departemen"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  }) : (
+                          </td>
+                          <td className="p-2 text-center text-slate-600 font-medium border-r border-slate-100 align-middle">
+                            {formatRupiah(getBudgetForYear(2025).actual)}
+                          </td>
+                          <td className={`p-2 text-center font-bold border-r border-slate-100 align-middle ${
+                            getBudgetForYear(2025).budget - getBudgetForYear(2025).actual < 0 
+                              ? 'text-rose-600' 
+                              : getBudgetForYear(2025).budget - getBudgetForYear(2025).actual < getBudgetForYear(2025).budget * 0.2 
+                                ? 'text-amber-600' 
+                                : 'text-emerald-600'
+                          }`}>
+                            {formatRupiah(getBudgetForYear(2025).budget - getBudgetForYear(2025).actual)}
+                          </td>
+
+                          {/* 2026 Columns */}
+                          <td className="p-2 border-r border-slate-100 align-middle">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={getBudgetForYear(2026).budget === 0 ? '' : getBudgetForYear(2026).budget.toString()}
+                              onChange={(e) => {
+                                const val = sanitizeNumberInput(e.target.value);
+                                const numVal = val === '' ? 0 : Number(val);
+                                setDeptBudgets(prev => 
+                                  prev.map(item => 
+                                    item.department === deptName && item.year === 2026 
+                                      ? { ...item, budget: numVal } 
+                                      : item
+                                  )
+                                );
+                              }}
+                              placeholder="0"
+                              className="w-full text-center text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </td>
+                          <td className="p-2 text-center text-slate-600 font-medium border-r border-slate-100 align-middle">
+                            {formatRupiah(getBudgetForYear(2026).actual)}
+                          </td>
+                          <td className={`p-2 text-center font-bold border-r border-slate-100 align-middle ${
+                            getBudgetForYear(2026).budget - getBudgetForYear(2026).actual < 0 
+                              ? 'text-rose-600' 
+                              : getBudgetForYear(2026).budget - getBudgetForYear(2026).actual < getBudgetForYear(2026).budget * 0.2 
+                                ? 'text-amber-600' 
+                                : 'text-emerald-600'
+                          }`}>
+                            {formatRupiah(getBudgetForYear(2026).budget - getBudgetForYear(2026).actual)}
+                          </td>
+
+                          {/* 2027 Columns */}
+                          <td className="p-2 border-r border-slate-100 align-middle">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={getBudgetForYear(2027).budget === 0 ? '' : getBudgetForYear(2027).budget.toString()}
+                              onChange={(e) => {
+                                const val = sanitizeNumberInput(e.target.value);
+                                const numVal = val === '' ? 0 : Number(val);
+                                setDeptBudgets(prev => 
+                                  prev.map(item => 
+                                    item.department === deptName && item.year === 2027 
+                                      ? { ...item, budget: numVal } 
+                                      : item
+                                  )
+                                );
+                              }}
+                              placeholder="0"
+                              className="w-full text-center text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </td>
+                          <td className="p-2 text-center text-slate-600 font-medium border-r border-slate-100 align-middle">
+                            {formatRupiah(getBudgetForYear(2027).actual)}
+                          </td>
+                          <td className={`p-2 text-center font-bold border-r border-slate-100 align-middle ${
+                            getBudgetForYear(2027).budget - getBudgetForYear(2027).actual < 0 
+                              ? 'text-rose-600' 
+                              : getBudgetForYear(2027).budget - getBudgetForYear(2027).actual < getBudgetForYear(2027).budget * 0.2 
+                                ? 'text-amber-600' 
+                                : 'text-emerald-600'
+                          }`}>
+                            {formatRupiah(getBudgetForYear(2027).budget - getBudgetForYear(2027).actual)}
+                          </td>
+
+                          {/* Aksi Column */}
+                          <td className="p-2 text-center align-middle">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Hapus semua data budget untuk departemen "${deptName}" dari semua tahun?`)) {
+                                  setDeptBudgets(prev => prev.filter(d => d.department !== deptName));
+                                  syncBudgetsToParent(prev.filter(d => d.department !== deptName));
+                                }
+                              }}
+                              className="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50 transition-colors"
+                              title="Hapus Semua Data Departemen Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
-                        Belum ada alokasi budget untuk tahun {selectedBudgetYear}. Silakan tambah departemen baru.
+                      <td colSpan={13} className="p-8 text-center text-slate-400 font-medium">
+                        Belum ada alokasi budget. Silakan tambah departemen baru dengan memilih tahun.
                       </td>
                     </tr>
                   )}
@@ -563,7 +671,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5 sm:p-6">
-              <div><h4 className="text-lg font-extrabold text-slate-800">Tambah Departemen</h4><p className="text-xs text-slate-400">Buat alokasi budget untuk departemen baru.</p></div>
+              <div><h4 className="text-lg font-extrabold text-slate-800">Tambah Departemen + Tahun</h4><p className="text-xs text-slate-400">Buat alokasi budget untuk departemen baru pada tahun tertentu.</p></div>
               <button type="button" onClick={() => { setNewDeptName(''); setNewDeptBudget(0); setIsBudgetModalOpen(false); }} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleAddDeptBudget} className="space-y-4 p-5 sm:p-6">
@@ -584,7 +692,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     inputMode="numeric"
                     required
                     value={newDeptBudget === 0 ? '' : newDeptBudget.toString()}
-                    onChange={(e) => { const val = sanitizeNumberInput(e.target.value); setNewDeptBudget(val === '' ? 0 : Number(val)); }}
+                    onChange={(e) => { 
+                      const val = sanitizeNumberInput(e.target.value); 
+                      setNewDeptBudget(val === '' ? 0 : Number(val)); 
+                    }}
                     placeholder="0"
                     className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
