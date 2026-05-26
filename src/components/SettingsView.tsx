@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Settings, Sparkles, CalendarDays, Clock, DollarSign, Save, CheckCircle2,
   Users, Plus, Edit3, Trash2, ShieldCheck, X, Target, MessageCircle,
-  Eye, EyeOff, Lock
+  Eye, EyeOff, Lock, ChevronDown
 } from 'lucide-react';
 import { AppSettings, SlaSetting, AdminRole } from '../data/mockData';
 
@@ -21,10 +21,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   );
   const [targetSlaManagement, setTargetSlaManagement] = useState(settings.targetSlaManagement ?? 85);
   
-  // 🔹 DEFAULT 0: Budget default 0
+  // 🔹 MIGRASI DATA LAMA: Jika budget tidak punya year, asumsikan 2025
   const [deptBudgets, setDeptBudgets] = useState(
-    settings.budgetCostHiring.map(b => ({ ...b, budget: b.budget || 0 }))
+    settings.budgetCostHiring.map(b => ({ 
+      ...b, 
+      year: b.year || 2025, // Default tahun lama ke 2025
+      budget: b.budget || 0 
+    }))
   );
+  
+  // 🔹 FILTER TAHUN BUDGET (Default 2025)
+  const [selectedBudgetYear, setSelectedBudgetYear] = useState<number>(2025);
+  const availableYears = Array.from(new Set([2025, 2026, 2027, ...deptBudgets.map(b => b.year)]));
   
   const [adminRoles, setAdminRoles] = useState<AdminRole[]>(
     settings.adminRoles.map((role) => ({ ...role }))
@@ -67,9 +75,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   // 🔹 HELPER: Sanitasi input angka (hilangkan leading zero, hanya digit)
   const sanitizeNumberInput = (value: string): string => {
-    // Hapus semua karakter non-digit
     let cleaned = value.replace(/[^\d]/g, '');
-    // Hapus leading zero (misal: "03" -> "3", "007" -> "7")
     if (cleaned.startsWith('0') && cleaned.length > 1) {
       cleaned = cleaned.replace(/^0+/, '');
     }
@@ -85,10 +91,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   };
 
   // 🔹 HANDLER BUDGET: Simpan sebagai string sementara, konversi saat save
-  const handleBudgetChange = (dept: string, rawValue: string) => {
+  const handleBudgetChange = (dept: string, year: number, rawValue: string) => {
     const sanitized = sanitizeNumberInput(rawValue);
     setDeptBudgets(prev =>
-      prev.map(item => item.department === dept ? { ...item, budget: sanitized === '' ? 0 : Number(sanitized) } : item)
+      prev.map(item => (item.department === dept && item.year === year) 
+        ? { ...item, budget: sanitized === '' ? 0 : Number(sanitized) } 
+        : item)
     );
   };
 
@@ -103,11 +111,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     e.preventDefault();
     if (!newDeptName.trim()) return;
     const trimmedName = newDeptName.trim();
-    if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase())) {
-      alert("Departemen sudah ada!");
+    
+    // Cek duplikat per kombinasi department + year
+    if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase() && d.year === selectedBudgetYear)) {
+      alert(`Departemen "${trimmedName}" sudah ada untuk tahun ${selectedBudgetYear}!`);
       return;
     }
-    const newEntry = { department: trimmedName, budget: newDeptBudget, actual: 0 };
+
+    const newEntry = { department: trimmedName, year: selectedBudgetYear, budget: newDeptBudget, actual: 0 };
     const nextBudgets = [...deptBudgets, newEntry];
     setDeptBudgets(nextBudgets);
     syncBudgetsToParent(nextBudgets);
@@ -119,8 +130,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
   };
 
-  const handleRemoveDeptBudget = (deptName: string) => {
-    const nextBudgets = deptBudgets.filter(d => d.department !== deptName);
+  const handleRemoveDeptBudget = (deptName: string, year: number) => {
+    const nextBudgets = deptBudgets.filter(d => !(d.department === deptName && d.year === year));
     setDeptBudgets(nextBudgets);
     syncBudgetsToParent(nextBudgets);
   };
@@ -170,13 +181,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       alert(`⚠️ Target SLA tahap "${invalidSla.stage}" tidak boleh kurang dari 1 hari.`);
       return;
     }
-    
-    // Validasi Budget: tidak boleh < 1.000.000
-    const invalidBudget = deptBudgets.find(item => item.budget < 1000000);
-    if (invalidBudget) {
-      alert(`⚠️ Budget departemen "${invalidBudget.department}" tidak boleh kurang dari Rp1.000.000.`);
-      return;
-    }
 
     const updatedSettings: AppSettings = {
       autoScreeningATS, syncGoogleCalendar, targetSlaDays, targetSlaManagement,
@@ -190,6 +194,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   // 🔹 CLASS CSS UNTUK INPUT ANGKA TANPA SPINNER
   const numberInputClass = "w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
+  // Filter budget berdasarkan tahun terpilih
+  const filteredBudgets = deptBudgets.filter(b => b.year === selectedBudgetYear);
+  const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
   return (
     <div className="space-y-6">
@@ -343,7 +351,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         </div>
 
-        {/* Card 3: Budget Cost Hiring per Department */}
+        {/* Card 3: Budget Cost Hiring per Department (FORMAT TABEL) */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 lg:col-span-2 flex flex-col">
           <div className="space-y-4 flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-2">
@@ -351,40 +359,95 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <DollarSign className="w-4 h-4 text-indigo-600" />
                 <h3>Budget Cost Hiring per Departemen (IDR)</h3>
               </div>
-              <button type="button" onClick={() => setIsBudgetModalOpen(true)} className="inline-flex items-center gap-2 self-start rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100">
-                <Plus className="w-3.5 h-3.5" /> Tambah Departemen
-              </button>
+              
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                {/* 🔹 DROPDOWN FILTER TAHUN */}
+                <div className="relative">
+                  <select
+                    value={selectedBudgetYear}
+                    onChange={(e) => setSelectedBudgetYear(Number(e.target.value))}
+                    className="appearance-none pl-3 pr-8 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    {availableYears.sort().map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+
+                <button type="button" onClick={() => setIsBudgetModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100">
+                  <Plus className="w-3.5 h-3.5" /> Tambah Departemen
+                </button>
+              </div>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Atur batas budget tahunan untuk perekrutan per divisi.
+              Atur batas budget tahunan untuk perekrutan per divisi. CareerHub akan memantau pengeluaran aktual berdasarkan expected salary kandidat hired.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {deptBudgets.map((dept) => (
-                <div key={dept.department} className="space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-600 block truncate" title={dept.department}>{dept.department}</label>
-                    <button type="button" onClick={() => { if (window.confirm(`Hapus budget untuk departemen ${dept.department}?`)) handleRemoveDeptBudget(dept.department); }} className="text-rose-500 hover:text-rose-700 p-0.5 rounded hover:bg-rose-50 transition-colors" title="Hapus Departemen">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2.5 text-xs text-slate-400 font-bold">Rp</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={dept.budget === 0 ? '' : dept.budget.toString()}
-                      onChange={(e) => handleBudgetChange(dept.department, e.target.value)}
-                      placeholder="0"
-                      className={`${numberInputClass} pl-8 font-bold`}
-                    />
-                  </div>
-                </div>
-              ))}
-              {deptBudgets.length === 0 && (
-                <div className="col-span-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 font-medium">
-                  Belum ada departemen. Silakan tambah departemen baru.
-                </div>
-              )}
+
+            {/* 🔹 FORMAT TABEL BUDGET */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3 border-b border-slate-200 font-bold">Departemen</th>
+                    <th className="p-3 border-b border-slate-200 font-bold text-center">Tahun</th>
+                    <th className="p-3 border-b border-slate-200 font-bold">Budget (IDR)</th>
+                    <th className="p-3 border-b border-slate-200 font-bold">Actual (IDR)</th>
+                    <th className="p-3 border-b border-slate-200 font-bold">Sisa Budget</th>
+                    <th className="p-3 border-b border-slate-200 font-bold text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filteredBudgets.length > 0 ? filteredBudgets.map((dept) => {
+                    const remaining = dept.budget - dept.actual;
+                    return (
+                      <tr key={`${dept.department}-${dept.year}`} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-3 font-bold text-slate-800">{dept.department}</td>
+                        <td className="p-3 text-center text-slate-600">{dept.year}</td>
+                        <td className="p-3">
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-2 text-[10px] text-slate-400 font-bold">Rp</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={dept.budget === 0 ? '' : dept.budget.toString()}
+                              onChange={(e) => handleBudgetChange(dept.department, dept.year, e.target.value)}
+                              placeholder="0"
+                              className={`${numberInputClass} pl-7 font-bold`}
+                            />
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-600 font-medium">{formatRupiah(dept.actual)}</td>
+                        <td className="p-3">
+                          <span className={`font-bold ${remaining < 0 ? 'text-rose-600' : remaining < dept.budget * 0.2 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {formatRupiah(remaining)}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Hapus budget untuk departemen ${dept.department} tahun ${dept.year}?`)) {
+                                handleRemoveDeptBudget(dept.department, dept.year);
+                              }
+                            }}
+                            className="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50 transition-colors"
+                            title="Hapus Departemen"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
+                        Belum ada alokasi budget untuk tahun {selectedBudgetYear}. Silakan tambah departemen baru.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
@@ -505,6 +568,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
             <form onSubmit={handleAddDeptBudget} className="space-y-4 p-5 sm:p-6">
               <div><label className="mb-1 block text-xs font-bold text-slate-600">Nama Departemen</label><input type="text" required value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none" placeholder="Contoh: Finance" /></div>
+              
+              {/* 🔹 INFO TAHUN OTOMATIS SESUAI FILTER */}
+              <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-700">Tahun Anggaran:</span>
+                <span className="text-sm font-black text-indigo-800">{selectedBudgetYear}</span>
+              </div>
+
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-600">Alokasi Budget (IDR)</label>
                 <div className="relative">
