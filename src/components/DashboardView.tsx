@@ -1,12 +1,20 @@
-import React, { useMemo } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
-} from 'recharts';
-import {
-  Users, Briefcase, CheckCircle2, Clock, TrendingUp, DollarSign,
-  Filter, ChevronDown, CalendarDays, ArrowRight
+import React from 'react';
+import { 
+  Users, 
+  Briefcase, 
+  UserCheck, 
+  Stethoscope, 
+  FileCheck, 
+  Activity, 
+  CalendarClock, 
+  Clock, 
+  ArrowUpRight,
+  TrendingUp,
+  Award,
+  CheckCircle
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
+import { RecruitmentCharts } from './RecruitmentCharts';
 
 interface DashboardViewProps {
   candidates: Candidate[];
@@ -22,328 +30,587 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  candidates, jobs, settings,
-  filterRange, setFilterRange,
-  filterYear, setFilterYear, // Pastikan default di App.tsx adalah 2026
-  filterQuarters, setFilterQuarters,
+  candidates,
+  jobs,
+  settings,
+  filterRange,
+  setFilterRange,
+  filterYear,
+  setFilterYear,
+  filterQuarters,
+  setFilterQuarters,
   setActiveMenu
 }) => {
+  const nowDate = new Date();
 
-  // --- 1. FILTER LOGIC FOR CANDIDATES & JOBS ---
-  const filteredCandidates = useMemo(() => {
-    return candidates.filter(cand => {
-      // Gunakan tanggalHired jika ada, jika tidak pakai tanggalApplied sebagai fallback untuk filtering visual
-      const dateStr = cand.tanggalHired || cand.tanggalApplied;
-      if (!dateStr) return false;
+  // Derive available years from all candidate and job dates
+  const allYears = Array.from(new Set([
+    ...candidates.map(c => new Date(c.tanggalApplied).getFullYear()),
+    ...jobs.map(j => new Date(j.createdAt).getFullYear()),
+    nowDate.getFullYear()
+  ])).sort((a, b) => b - a); // descending
 
-      const hiredDate = new Date(dateStr);
-      const yearMatch = hiredDate.getFullYear() === filterYear;
-      
-      let rangeMatch = true;
-      if (filterRange === 'month') {
-        const now = new Date();
-        rangeMatch = hiredDate.getMonth() === now.getMonth() && hiredDate.getFullYear() === now.getFullYear();
-      } else if (filterRange === '6months') {
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        rangeMatch = hiredDate >= sixMonthsAgo;
-      }
-      // 'annual' matches any date in the selected filterYear
+  // Quarter helper: get quarter number (1–4) from a Date
+  const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
 
-      return yearMatch && rangeMatch;
-    });
-  }, [candidates, filterYear, filterRange]);
+  // Date helper
+  const diffInDays = (d1: string, d2: string) => {
+    const timeDiff = new Date(d1).getTime() - new Date(d2).getTime();
+    return Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24)));
+  };
 
-  const activeJobsCount = jobs.filter(j => j.status === 'Aktif').length;
+  // Check if a date belongs to the selected quarter(s) within the selected year
+  const isWithinYearAndQuarter = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
 
-  // --- 2. BUDGET & DEPARTMENT FILTER LOGIC ---
-  
-  // Extract unique departments from settings budget for the filter dropdown
-  const availableDepts = useMemo(() => {
-    const depts = new Set(settings.budgetCostHiring.map(b => b.department));
-    return Array.from(depts).sort();
-  }, [settings.budgetCostHiring]);
+    // Year filter
+    if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
 
-  const [filterDept, setFilterDept] = React.useState<string>('All');
-
-  // Calculate Budget Metrics based on Year and Department Filter
-  const budgetMetrics = useMemo(() => {
-    let totalBudget = 0;
-    let totalActual = 0;
-    
-    // Get all hired candidates in the selected year to calculate Actual Spend
-    // FIX: Fallback to current year if tanggalHired is missing but status is hired
-    const hiredInYear = candidates.filter(c => {
-      if (c.tahapProses !== 'hired') return false;
-      
-      // Determine year: prefer tanggalHired, fallback to current filterYear if empty
-      let yearToCheck = filterYear;
-      if (c.tanggalHired) {
-        yearToCheck = new Date(c.tanggalHired).getFullYear();
-      }
-      
-      return yearToCheck === filterYear;
-    });
-
-    settings.budgetCostHiring.forEach(item => {
-      // Only consider budgets for the selected year
-      if (item.year !== filterYear) return;
-
-      // Apply Department Filter
-      if (filterDept !== 'All' && item.department !== filterDept) return;
-
-      totalBudget += item.budget;
-
-      // Calculate Actual Spend for this department in this year
-      // Simple matching: check if job title contains dept name or vice versa
-      const deptActual = hiredInYear
-        .filter(c => 
-          c.posisiDilamar.toLowerCase().includes(item.department.toLowerCase()) || 
-          item.department.toLowerCase().includes(c.posisiDilamar.toLowerCase())
-        )
-        .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
-      
-      totalActual += deptActual;
-    });
-
-    const remaining = totalBudget - totalActual;
-    const utilization = totalBudget > 0 ? (totalActual / totalBudget) * 100 : 0;
-
-    return { totalBudget, totalActual, remaining, utilization };
-  }, [settings.budgetCostHiring, candidates, filterYear, filterDept]);
-
-  // Prepare Data for Bar Chart (Budget vs Actual per Department or Total)
-  const chartData = useMemo(() => {
-    if (filterDept === 'All') {
-      // Show aggregate data for the selected year
-      return [
-        {
-          name: `Total ${filterYear}`,
-          Budget: budgetMetrics.totalBudget,
-          Actual: budgetMetrics.totalActual,
-        }
-      ];
-    } else {
-      // Show specific department data
-      const deptBudget = settings.budgetCostHiring.find(b => b.department === filterDept && b.year === filterYear);
-      const budgetVal = deptBudget ? deptBudget.budget : 0;
-      
-      // Calculate actual for this specific dept
-      // FIX: Same logic as above for hired candidates
-      const hiredInYear = candidates.filter(c => {
-        if (c.tahapProses !== 'hired') return false;
-        let yearToCheck = filterYear;
-        if (c.tanggalHired) {
-          yearToCheck = new Date(c.tanggalHired).getFullYear();
-        }
-        return yearToCheck === filterYear;
-      });
-      
-      const actualVal = hiredInYear
-        .filter(c => 
-          c.posisiDilamar.toLowerCase().includes(filterDept.toLowerCase()) || 
-          filterDept.toLowerCase().includes(c.posisiDilamar.toLowerCase())
-        )
-        .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
-
-      return [
-        {
-          name: filterDept,
-          Budget: budgetVal,
-          Actual: actualVal,
-        }
-      ];
+    // Quarter filter (if any quarters are selected)
+    if (filterQuarters.length > 0) {
+      const q = getQuarter(date);
+      if (!filterQuarters.includes(q)) return false;
     }
-  }, [filterDept, filterYear, budgetMetrics, settings.budgetCostHiring, candidates]);
 
-  // Helper for formatting currency
-  const formatRupiah = (val: number) => 
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+    return true;
+  };
+
+  const isWithinFilterRange = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+
+    // If quarters or specific year set, use year/quarter filter
+    if (filterQuarters.length > 0) {
+      return isWithinYearAndQuarter(dateStr);
+    }
+
+    // Year filter: restrict to selected year
+    if (filterYear !== 0) {
+      if (date.getFullYear() !== filterYear) return false;
+    }
+    
+    if (filterRange === 'month') {
+      return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
+    } else if (filterRange === '6months') {
+      const sixMonthsAgo = new Date(nowDate);
+      sixMonthsAgo.setMonth(nowDate.getMonth() - 6);
+      return date >= sixMonthsAgo && date <= nowDate;
+    } else {
+      // Annual: whole selected year
+      if (filterYear !== 0) {
+        return date.getFullYear() === filterYear;
+      }
+      const oneYearAgo = new Date(nowDate);
+      oneYearAgo.setFullYear(nowDate.getFullYear() - 1);
+      return date >= oneYearAgo && date <= nowDate;
+    }
+  };
+
+  const toggleQuarter = (q: number) => {
+    setFilterQuarters(
+      filterQuarters.includes(q) ? filterQuarters.filter(x => x !== q) : [...filterQuarters, q]
+    );
+  };
+
+  // Filter candidates and jobs based on the selected range
+  const filteredCandidates = candidates.filter((candidate) => isWithinFilterRange(candidate.tanggalApplied));
+  const filteredJobs = jobs.filter((job) => isWithinFilterRange(job.createdAt));
+  const displayCandidates = filteredCandidates;
+
+  // 6 Analytics Cards
+  const totalApplicantsCount = displayCandidates.length;
+  const activeJobsCount = filteredJobs.filter((job) => job.status === 'Aktif').length;
+  const interviewCount = displayCandidates.filter(c => c.tahapProses === 'interview').length;
+  const medicalCount = displayCandidates.filter(c => c.tahapProses === 'medical').length;
+  const offeringCount = displayCandidates.filter(c => c.tahapProses === 'offering').length;
+  const hiredCount = displayCandidates.filter(c => c.tahapProses === 'hired').length;
+
+  // SLA Table Calculation - IMPROVED ROBUSTNESS
+  const stages = [
+    { key: 'screening', label: 'Screening', startKey: 'tanggalApplied', endKey: 'tanggalScreening' },
+    { key: 'interview', label: 'Interview', startKey: 'tanggalScreening', endKey: 'tanggalInterview' },
+    { key: 'assessment', label: 'Assessment', startKey: 'tanggalInterview', endKey: 'tanggalAssessment' },
+    { key: 'medical', label: 'Medical Check', startKey: 'tanggalAssessment', endKey: 'tanggalMedical' },
+    { key: 'offering', label: 'Offering', startKey: 'tanggalMedical', endKey: 'tanggalOffering' },
+    { key: 'hired', label: 'Hired', startKey: 'tanggalOffering', endKey: 'tanggalHired' },
+  ];
+
+  let totalCompliant = 0;
+  let totalViolation = 0;
+
+  const slaTableData = stages.map(stg => {
+    const targetSetting = settings.targetSlaDays.find(t => t.stage === stg.key);
+    const targetDays = targetSetting ? targetSetting.targetDays : 3;
+    
+    let candidateCount = 0;
+    let compliantCount = 0;
+    let violationCount = 0;
+
+    displayCandidates.forEach(c => {
+      // Safe access to date fields
+      const startVal = (c as any)[stg.startKey];
+      const endVal = (c as any)[stg.endKey];
+
+      // Only process if start date exists and is valid
+      if (startVal && !isNaN(new Date(startVal).getTime())) {
+        candidateCount++;
+        
+        if (endVal && !isNaN(new Date(endVal).getTime())) {
+          // Completed stage: Calculate actual days
+          const days = diffInDays(endVal, startVal);
+          if (days <= targetDays) {
+            compliantCount++;
+          } else {
+            violationCount++;
+          }
+        } else {
+          // In-progress stage: Calculate days so far vs target
+          const todayStr = nowDate.toISOString().split('T')[0];
+          const daysSoFar = diffInDays(todayStr, startVal);
+          
+          // If days so far already exceed target, it's a violation (late)
+          // If still within target, it's compliant (on track)
+          if (daysSoFar > targetDays) {
+            violationCount++;
+          } else {
+            compliantCount++; 
+          }
+        }
+      }
+    });
+
+    const rate = candidateCount > 0 ? Math.round((compliantCount / candidateCount) * 100) : 0;
+    totalCompliant += compliantCount;
+    totalViolation += violationCount;
+
+    let status: 'OPTIMAL' | 'WARNING' | 'CRITICAL' = 'OPTIMAL';
+    if (rate < 50) status = 'CRITICAL';
+    else if (rate < 80) status = 'WARNING';
+
+    return {
+      stage: stg.label,
+      targetDays,
+      candidates: candidateCount,
+      compliant: compliantCount,
+      violation: violationCount,
+      rate,
+      status
+    };
+  });
+
+  // Calculate SLA compliant rate percentage
+  const totalSlaProcessed = totalCompliant + totalViolation;
+  const slaCompliantRate = totalSlaProcessed > 0 ? Math.round((totalCompliant / totalSlaProcessed) * 100) : 0;
+
+  // Calculate Average Days to Hire - IMPROVED SAFETY
+  const hiredCandidates = displayCandidates.filter(c => 
+    c.tahapProses === 'hired' && 
+    c.tanggalHired && 
+    c.tanggalApplied &&
+    !isNaN(new Date(c.tanggalHired).getTime()) &&
+    !isNaN(new Date(c.tanggalApplied).getTime())
+  );
+
+  let averageDaysToHire = 0;
+  if (hiredCandidates.length > 0) {
+    const totalDays = hiredCandidates.reduce((acc, c) => {
+      return acc + diffInDays(c.tanggalHired!, c.tanggalApplied);
+    }, 0);
+    averageDaysToHire = parseFloat((totalDays / hiredCandidates.length).toFixed(1));
+  }
+
+  // Target SLA - Dinamis berdasarkan data filter (Goal management benchmark vs realisasi)
+  // Menggunakan rata-rata target dari setting sebagai baseline, dibandingkan dengan realisasi filter
+  const averageTargetSla = settings.targetSlaDays.reduce((sum, s) => sum + s.targetDays, 0) / settings.targetSlaDays.length;
+  const targetSlaPercent = slaCompliantRate; // Realisasi aktual dari data terfilter
+  const slaGoalPercent = settings.targetSlaManagement ?? 85; // Target SLA dari pengaturan management
+
+    // 🔹 PERBAIKAN: Hitung Trend Dinamis vs Rata-Rata Historis
+  // 1. Hitung total compliant & violation untuk SEMUA kandidat (tanpa filter waktu)
+  let allTimeCompliant = 0;
+  let allTimeViolation = 0;
+
+  candidates.forEach(c => {
+    stages.forEach(stg => {
+      const startVal = (c as any)[stg.startKey];
+      const endVal = (c as any)[stg.endKey];
+      
+      if (startVal && !isNaN(new Date(startVal).getTime())) {
+        const targetSetting = settings.targetSlaDays.find(t => t.stage === stg.key);
+        const targetDays = targetSetting ? targetSetting.targetDays : 3;
+
+        if (endVal && !isNaN(new Date(endVal).getTime())) {
+          const days = diffInDays(endVal, startVal);
+          if (days <= targetDays) allTimeCompliant++;
+          else allTimeViolation++;
+        } else {
+           // Untuk tahap yang belum selesai, kita abaikan dalam perhitungan historis final 
+           // atau anggap compliant jika belum lewat target hari ini
+           const daysSoFar = diffInDays(nowDate.toISOString().split('T')[0], startVal);
+           if (daysSoFar <= targetDays) allTimeCompliant++;
+           else allTimeViolation++;
+        }
+      }
+    });
+  });
+
+  const allTimeTotal = allTimeCompliant + allTimeViolation;
+  const historicalSlaRate = allTimeTotal > 0 ? Math.round((allTimeCompliant / allTimeTotal) * 100) : 0;
+
+  // 2. Hitung Trend (Selisih antara Rate Periode Ini vs Rate Historis)
+  const slaTrend = slaCompliantRate - historicalSlaRate;
+  
+  // Recent Applicants
+  const recentApplicants = [...displayCandidates]
+    .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
-      {/* Header & Filters */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-800">Dashboard Analitik Rekrutmen</h2>
-          <p className="text-xs text-slate-500">Overview performa hiring, budget, dan pipeline kandidat.</p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Year Filter */}
-          <div className="relative group">
-            <button className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
-              <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
-              {filterYear}
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
-            {/* Simple Year Dropdown Implementation */}
-            <select 
-              value={filterYear} 
-              onChange={(e) => setFilterYear(Number(e.target.value))}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-            >
-              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+      {/* Top Welcome & Filter controls */}
+      <div className="bg-slate-900 text-white p-4 sm:p-6 rounded-2xl shadow-md space-y-4">
+        {/* Row 1: Welcome + Period Filter */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang Kembali, Team Rekrutmen!</h2>
+            <p className="text-slate-400 text-xs md:text-sm mt-1">Analisis performa, SLA rekrutmen, dan funnel pelamar secara real-time.</p>
           </div>
-
-          {/* Range Filter */}
-          <div className="flex bg-slate-100 p-1 rounded-lg">
-            {(['month', '6months', 'annual'] as const).map((r) => (
+          <div className="flex items-center gap-1 sm:gap-2 self-start lg:self-auto bg-slate-800 p-1.5 rounded-lg border border-slate-700 overflow-x-auto shrink-0">
+            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold px-2 whitespace-nowrap">Periode:</span>
+            {(['month', '6months', 'annual'] as const).map((range) => (
               <button
-                key={r}
-                onClick={() => setFilterRange(r)}
-                className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${
-                  filterRange === r ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                key={range}
+                onClick={() => { setFilterRange(range); setFilterQuarters([]); }}
+                className={`px-2 sm:px-3 py-1.5 rounded text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap ${
+                  filterRange === range && filterQuarters.length === 0
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {r === 'month' ? 'Bulan Ini' : r === '6months' ? '6 Bulan' : 'Tahunan'}
+                {range === 'month' ? 'Bulan Ini' : range === '6months' ? '6 Bulan' : 'Tahunan'}
               </button>
             ))}
           </div>
-
-          {/* 🔹 NEW: Department Filter */}
-          <div className="relative">
-             <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs font-bold text-indigo-700">
-               <Filter className="w-3.5 h-3.5" />
-               <span>{filterDept === 'All' ? 'Semua Dept' : filterDept}</span>
-               <ChevronDown className="w-3 h-3 text-indigo-400" />
-             </div>
-             <select 
-               value={filterDept}
-               onChange={(e) => setFilterDept(e.target.value)}
-               className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-             >
-               <option value="All">Semua Departemen</option>
-               {availableDepts.map(d => <option key={d} value={d}>{d}</option>)}
-             </select>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Hired */}
-        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-start justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Hired ({filterYear})</p>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{filteredCandidates.length}</h3>
-            <p className="text-[10px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> Kandidat Baru
-            </p>
-          </div>
-          <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-            <Users className="w-5 h-5" />
-          </div>
         </div>
 
-        {/* Active Jobs */}
-        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-start justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lowongan Aktif</p>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{activeJobsCount}</h3>
-            <p className="text-[10px] text-slate-500 font-semibold mt-1">Posisi Terbuka</p>
+        {/* Row 2: Year Dropdown + Quarter Checkboxes */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800">
+          {/* Year Dropdown */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Tahun:</span>
+            <select
+              value={filterYear}
+              onChange={(e) => { setFilterYear(Number(e.target.value)); setFilterQuarters([]); }}
+              className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
+            >
+              <option value={0}>Semua Tahun</option>
+              {allYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
           </div>
-          <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
-            <Briefcase className="w-5 h-5" />
-          </div>
-        </div>
 
-        {/* Budget Utilization */}
-        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-start justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Utilisasi Budget</p>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{budgetMetrics.utilization.toFixed(1)}%</h3>
-            <p className={`text-[10px] font-semibold mt-1 ${budgetMetrics.utilization > 90 ? 'text-rose-600' : 'text-emerald-600'}`}>
-              {budgetMetrics.utilization > 90 ? 'Hampir Habis' : 'Masih Aman'}
-            </p>
-          </div>
-          <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
-            <DollarSign className="w-5 h-5" />
-          </div>
-        </div>
+          {/* Divider */}
+          <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
 
-        {/* Remaining Budget */}
-        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-start justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sisa Budget</p>
-            <h3 className="text-xl font-black text-slate-800 mt-1 truncate">{formatRupiah(budgetMetrics.remaining)}</h3>
-            <p className="text-[10px] text-slate-500 font-semibold mt-1">Dari Total {formatRupiah(budgetMetrics.totalBudget)}</p>
+          {/* Quarter Checkboxes */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Kuartal:</span>
+            {[
+              { q: 1, label: 'Q1', desc: 'Jan–Mar' },
+              { q: 2, label: 'Q2', desc: 'Apr–Jun' },
+              { q: 3, label: 'Q3', desc: 'Jul–Sep' },
+              { q: 4, label: 'Q4', desc: 'Okt–Des' },
+            ].map(({ q, label, desc }) => {
+              const isActive = filterQuarters.includes(q);
+              return (
+                <button
+                  key={q}
+                  onClick={() => toggleQuarter(q)}
+                  title={desc}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] sm:text-xs font-bold transition-all ${
+                    isActive
+                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'
+                  }`}
+                >
+                  <span className={`w-3.5 h-3.5 flex items-center justify-center rounded border text-[8px] font-black shrink-0 ${
+                    isActive ? 'bg-white/20 border-white/40 text-white' : 'border-slate-600'
+                  }`}>
+                    {isActive ? '✓' : ''}
+                  </span>
+                  {label}
+                  <span className={`hidden sm:inline text-[9px] font-medium ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    {desc}
+                  </span>
+                </button>
+              );
+            })}
+            {filterQuarters.length > 0 && (
+              <button
+                onClick={() => setFilterQuarters([])}
+                className="text-[10px] text-slate-500 hover:text-rose-400 font-bold transition-colors underline underline-offset-2"
+              >
+                Reset Q
+              </button>
+            )}
           </div>
-          <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Main Chart: Budget vs Actual */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="font-extrabold text-slate-800 text-sm">Analisa Cost Hiring: Budget vs Actual</h3>
-              <p className="text-[10px] text-slate-400">Perbandingan alokasi budget dengan realisasi pengeluaran gaji kandidat hired.</p>
+          {/* Active filter summary badge */}
+          {(filterYear !== 0 || filterQuarters.length > 0) && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                {filterYear !== 0 ? `${filterYear}` : ''}{filterQuarters.length > 0 ? ` · ${filterQuarters.map(q => `Q${q}`).join(', ')}` : ''}
+              </span>
+              <button
+                onClick={() => { setFilterYear(nowDate.getFullYear()); setFilterQuarters([]); }}
+                className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2"
+              >
+                Reset
+              </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* 6 Analytics Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        {[
+          { title: "Total Pelamar", count: totalApplicantsCount, icon: Users, color: "text-blue-600 bg-blue-50 border-blue-100" },
+          { title: "Lowongan Aktif", count: activeJobsCount, icon: Briefcase, color: "text-indigo-600 bg-indigo-50 border-indigo-100" },
+          { title: "Kandidat Interview", count: interviewCount, icon: UserCheck, color: "text-purple-600 bg-purple-50 border-purple-100" },
+          { title: "Medical Check", count: medicalCount, icon: Stethoscope, color: "text-amber-600 bg-amber-50 border-amber-100" },
+          { title: "Offering Letter", count: offeringCount, icon: FileCheck, color: "text-teal-600 bg-teal-50 border-teal-100" },
+          { title: "Total Hired", count: hiredCount, icon: Award, color: "text-emerald-600 bg-emerald-50 border-emerald-100" }
+        ].map((card, idx) => {
+          const Icon = card.icon;
+          return (
+            <div key={idx} className={`p-3 sm:p-4 bg-white rounded-xl border flex items-center justify-between gap-2 shadow-sm hover:shadow transition-shadow ${card.color}`}>
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block truncate">{card.title}</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight block mt-1">{card.count}</span>
+              </div>
+              <div className="p-2 sm:p-3 rounded-lg bg-white shadow-sm border border-slate-100 shrink-0">
+                <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 3 SLA Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+        {/* SLA Compliant */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
+          <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
+            <Activity className="w-6 h-6 sm:w-7 sm:h-7" />
           </div>
-          
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 11, fill: '#64748b' }} 
-                  tickFormatter={(val) => `${val / 1000000}jt`}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => formatRupiah(value)}
-                />
-                <Legend verticalAlign="top" height={36} iconType="circle" />
-                <Bar dataKey="Budget" name="Anggaran" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={40} />
-                <Bar dataKey="Actual" name="Realisasi" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-slate-400 block">SLA Compliant Rate</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-extrabold text-slate-800">{slaCompliantRate}%</span>
+              <span className={`text-xs font-bold flex items-center gap-0.5 ${slaTrend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                <TrendingUp className={`w-3.5 h-3.5 ${slaTrend < 0 ? 'rotate-180' : ''}`} /> {slaTrend >= 0 ? '+' : ''}{slaTrend.toFixed(1)}%
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Total tahapan proses yang memenuhi target waktu.</p>
           </div>
         </div>
 
-        {/* Side Panel: Quick Stats or Pipeline */}
-        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
-           <h3 className="font-extrabold text-slate-800 text-sm mb-4">Status Pipeline Kandidat</h3>
-           <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-              {['Applied', 'Screening', 'Interview', 'Offering', 'Hired'].map((stage, idx) => {
-                 const count = candidates.filter(c => c.tahapProses.toLowerCase() === stage.toLowerCase()).length;
-                 const colors = ['bg-blue-100 text-blue-700', 'bg-indigo-100 text-indigo-700', 'bg-purple-100 text-purple-700', 'bg-teal-100 text-teal-700', 'bg-emerald-100 text-emerald-700'];
-                 return (
-                   <div key={stage} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-8 rounded-full ${colors[idx].split(' ')[0].replace('100', '500')}`} />
-                        <div>
-                          <p className="text-xs font-bold text-slate-700">{stage}</p>
-                          <p className="text-[10px] text-slate-400">Kandidat Aktif</p>
+        {/* Rata-rata Hired */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
+          <div className="p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+            <Clock className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-slate-400 block">Rata-rata Waktu Hired (SLA)</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-extrabold text-slate-800">{averageDaysToHire} Hari</span>
+              <span className={`text-xs font-bold flex items-center gap-0.5 ${averageDaysToHire <= averageTargetSla ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {averageDaysToHire <= averageTargetSla ? '✓ On Track' : `⚠ Max ${Math.round(averageTargetSla)} Hari`}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Rata-rata waktu proses apply hingga tanda tangan kontrak.</p>
+          </div>
+        </div>
+
+        {/* Target SLA */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4 sm:col-span-2 lg:col-span-1">
+          <div className="p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 shrink-0">
+            <CalendarClock className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-slate-400 block">Target SLA Terpenuhi</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-extrabold text-slate-800">{targetSlaPercent}%</span>
+              <span className={`text-xs font-bold ${targetSlaPercent >= slaGoalPercent ? 'text-emerald-600' : 'text-amber-600'}`}>
+                Goal: {slaGoalPercent}%
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Target kumulatif kepatuhan SLA yang ditetapkan Management.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Recruitment Visualizations */}
+      <RecruitmentCharts 
+        candidates={displayCandidates}
+        jobs={filteredJobs}
+        settings={settings}
+        filterRange={filterRange}
+        filterYear={filterYear}
+        filterQuarters={filterQuarters}
+      />
+
+      {/* SLA Detail Table */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Detail Kepatuhan SLA Rekrutmen</h3>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
+                <CheckCircle className="w-2.5 h-2.5" /> {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
+              </span>
+            </div>
+            <p className="text-slate-400 text-[11px] sm:text-xs">Evaluasi waktu proses kandidat pada masing-masing tahapan (berdasarkan filter aktif)</p>
+          </div>
+          <span className="self-start sm:self-auto px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] sm:text-xs font-bold rounded-full whitespace-nowrap">
+            Realtime SLA Tracker
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[820px]">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-100">
+                <th className="p-4">TAHAPAN REKRUTMEN</th>
+                <th className="p-4">TARGET SLA</th>
+                <th className="p-4">TOTAL KANDIDAT</th>
+                <th className="p-4">COMPLIANT (≤ SLA)</th>
+                <th className="p-4">VIOLATION (&gt; SLA)</th>
+                <th className="p-4">COMPLIANT RATE</th>
+                <th className="p-4">STATUS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {slaTableData.map((row, index) => {
+                const getStatusBadge = (status: string) => {
+                  switch (status) {
+                    case 'OPTIMAL':
+                      return <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-extrabold rounded-md text-[10px]">OPTIMAL</span>;
+                    case 'WARNING':
+                      return <span className="px-2.5 py-1 bg-amber-50 text-amber-700 font-extrabold rounded-md text-[10px]">WARNING</span>;
+                    default:
+                      return <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-extrabold rounded-md text-[10px]">CRITICAL</span>;
+                  }
+                };
+
+                return (
+                  <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 font-bold text-slate-800">{row.stage}</td>
+                    <td className="p-4 font-semibold text-slate-600">{row.targetDays} Hari</td>
+                    <td className="p-4 text-slate-600">{row.candidates} Orang</td>
+                    <td className="p-4 text-emerald-600 font-medium">✓ {row.compliant}</td>
+                    <td className="p-4 text-rose-600 font-medium">✗ {row.violation}</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold w-9">{row.rate}%</span>
+                        <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0">
+                          <div 
+                            className={`h-full rounded-full ${
+                              row.status === 'OPTIMAL' ? 'bg-emerald-500' : row.status === 'WARNING' ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${row.rate}%` }}
+                          />
                         </div>
                       </div>
-                      <span className="text-lg font-black text-slate-800">{count}</span>
-                   </div>
-                 )
+                    </td>
+                    <td className="p-4">{getStatusBadge(row.status)}</td>
+                  </tr>
+                );
               })}
-           </div>
-           <button onClick={() => setActiveMenu('candidates')} className="mt-4 w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-             Lihat Semua Kandidat <ArrowRight className="w-3 h-3" />
-           </button>
+            </tbody>
+          </table>
         </div>
+      </div>
 
+      {/* Latest Applicants */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Pelamar Terbaru Masuk</h3>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
+                <CheckCircle className="w-2.5 h-2.5" /> {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
+              </span>
+            </div>
+            <p className="text-slate-400 text-[11px] sm:text-xs">Kandidat yang baru saja mensubmit aplikasi lamaran (berdasarkan filter aktif)</p>
+          </div>
+          <button 
+            onClick={() => setActiveMenu('candidates')}
+            className="self-start sm:self-auto text-[11px] sm:text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 whitespace-nowrap"
+          >
+            Lihat Database Kandidat <ArrowUpRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[780px]">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-100">
+                <th className="p-4">ID / NAMA</th>
+                <th className="p-4">POSISI DILAMAR</th>
+                <th className="p-4">PENDIDIKAN</th>
+                <th className="p-4">ATS MATCH</th>
+                <th className="p-4">TANGGAL APPLY</th>
+                <th className="p-4">STATUS PROSES</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {recentApplicants.map((cand) => {
+                const getStatusBadge = (tahap: string) => {
+                  const colors: Record<string, string> = {
+                    applied: 'bg-blue-100 text-blue-800',
+                    screening: 'bg-indigo-100 text-indigo-800',
+                    interview: 'bg-purple-100 text-purple-800',
+                    assessment: 'bg-pink-100 text-pink-800',
+                    medical: 'bg-amber-100 text-amber-800',
+                    offering: 'bg-teal-100 text-teal-800',
+                    hired: 'bg-emerald-100 text-emerald-800',
+                    rejected: 'bg-rose-100 text-rose-800'
+                  };
+                  return (
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${colors[tahap] || 'bg-slate-100 text-slate-800'}`}>
+                      {tahap === 'medical' ? 'Medical Check' : tahap}
+                    </span>
+                  );
+                };
+
+                const getMatchBadge = (rating: number) => {
+                  if (rating >= 85) return <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{rating}% Fit</span>;
+                  if (rating >= 70) return <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{rating}% Match</span>;
+                  return <span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{rating}% Low</span>;
+                };
+
+                return (
+                  <tr key={cand.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800">{cand.nama}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 font-medium text-slate-700">{cand.posisiDilamar}</td>
+                    <td className="p-4 text-slate-500">{cand.pendidikan} - {cand.jurusan}</td>
+                    <td className="p-4">{getMatchBadge(cand.ratingKecocokan)}</td>
+                    <td className="p-4 font-semibold text-slate-600">{cand.tanggalApplied}</td>
+                    <td className="p-4">{getStatusBadge(cand.tahapProses)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
