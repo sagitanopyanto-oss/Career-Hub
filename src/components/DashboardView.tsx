@@ -218,13 +218,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }));
   }, [settings.budgetCostHiring, candidates]);
 
-  // Filter chart data based on multi-select years
+  // Filter chart data based on multi-select years OR global filterYear
   const filteredCostData = useMemo(() => {
-    if (selectedYears.length === 0) return costHiringData; // Show all if none selected
-    return costHiringData.filter(item => selectedYears.includes(item.year));
-  }, [costHiringData, selectedYears]);
+    let baseData = costHiringData;
 
-  const maxCostVal = Math.max(...filteredCostData.map(d => Math.max(d.budget, d.actual)), 1);
+    // If global filterYear is set (not 0), prioritize it
+    if (filterYear !== 0) {
+      baseData = baseData.filter(item => item.year === filterYear);
+    }
+
+    // Then apply multi-select if any
+    if (selectedYears.length > 0) {
+      baseData = baseData.filter(item => selectedYears.includes(item.year));
+    }
+
+    return baseData;
+  }, [costHiringData, filterYear, selectedYears]);
+
   const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
   return (
@@ -392,7 +402,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         filterQuarters={filterQuarters}
       />
 
-      {/* 🔹 COST HIRING CLUSTER BAR CHART — DI ATAS TABEL SLA */}
+      {/* 🔹 COST HIRING SECTION - REVISED VERSION */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
           <div>
@@ -456,119 +466,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Chart Area */}
-        {filteredCostData.length > 0 ? (
-          <div className="space-y-6">
-            <div className="relative h-64 flex items-end gap-4 sm:gap-8 border-b border-l border-slate-200 pl-2 pb-2">
-              {/* Y-Axis Grid Lines */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                {[1, 0.75, 0.5, 0.25, 0].map((ratio) => (
-                  <div key={ratio} className="border-t border-dashed border-slate-100 w-full h-0 relative">
-                    <span className="absolute -left-16 -top-2.5 text-[9px] text-slate-400 font-medium w-14 text-right">
-                      {ratio > 0 ? `${(maxCostVal * ratio / 1000000).toFixed(0)}jt` : '0'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Bars */}
-              {filteredCostData.map((item) => {
-                const budgetHeight = maxCostVal > 0 ? (item.budget / maxCostVal) * 100 : 0;
-                const actualHeight = maxCostVal > 0 ? (item.actual / maxCostVal) * 100 : 0;
+        {/* 🔹 TABLE RINGKASAN - HANYA TAHUN + STATUS INDICATOR */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                <th className="py-2 text-left">TAHUN</th>
+                <th className="py-2 text-center">STATUS</th>
+                <th className="py-2 text-right">AKSI</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredCostData.length > 0 ? filteredCostData.map((item) => {
                 const isOver = item.actual > item.budget && item.budget > 0;
                 const variance = item.budget > 0 ? ((item.actual - item.budget) / item.budget * 100).toFixed(1) : null;
-                const isActiveYear = filterYear === item.year;
 
                 return (
-                  <div key={item.year} className={`flex-1 flex flex-col items-center gap-2 group relative ${isActiveYear ? 'opacity-100' : filterYear !== 0 ? 'opacity-40' : 'opacity-100'}`}>
-                    {/* Tooltip */}
-                    <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px]">
-                      <div className="font-bold mb-1.5 text-xs border-b border-slate-600 pb-1">{item.year}</div>
-                      <div className="flex justify-between gap-3"><span className="text-slate-300">Budget:</span> <span>{formatIDR(item.budget)}</span></div>
-                      <div className="flex justify-between gap-3"><span className="text-slate-300">Actual:</span> <span>{formatIDR(item.actual)}</span></div>
-                      {variance !== null && (
-                        <div className={`flex justify-between gap-3 mt-1 pt-1 border-t border-slate-600 font-bold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>
-                          <span>Variance:</span> <span>{Number(variance) >= 0 ? '+' : ''}{variance}%</span>
-                        </div>
+                  <tr key={item.year} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 font-bold text-slate-700">{item.year}</td>
+                    <td className="py-3 text-center">
+                      {item.budget === 0 && item.actual === 0 ? (
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-bold">No Data</span>
+                      ) : isOver ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full text-[9px] font-bold border border-rose-100">
+                          <AlertTriangle className="w-3 h-3" /> Over Budget
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[9px] font-bold border border-emerald-100">
+                          <CheckCircle className="w-3 h-3" /> On Budget
+                        </span>
                       )}
-                    </div>
-
-                    {/* Cluster Bars */}
-                    <div className="flex items-end gap-1 sm:gap-2 w-full justify-center h-full">
-                      <div className="relative flex flex-col items-center justify-end h-full">
-                        <div
-                          className="w-6 sm:w-10 bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500"
-                          style={{ height: `${Math.max(budgetHeight, 0.5)}%` }}
-                        ></div>
-                      </div>
-                      <div className="relative flex flex-col items-center justify-end h-full">
-                        <div
-                          className={`w-6 sm:w-10 rounded-t-md transition-all duration-500 ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
-                          style={{ height: `${Math.max(actualHeight, 0.5)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    {/* X-Axis Label */}
-                    <div className="text-center">
-                      <span className={`text-xs font-bold ${isActiveYear ? 'text-indigo-600' : 'text-slate-600'}`}>{item.year}</span>
-                      {isOver && <AlertTriangle className="w-3 h-3 text-rose-500 mx-auto mt-0.5" />}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Summary Table Below Chart - Simplified View */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-2 text-left">TAHUN</th>
-                    <th className="py-2 text-center">STATUS</th>
-                    <th className="py-2 text-right">AKSI</th>
+                    </td>
+                    <td className="py-3 text-right">
+                      <button
+                        onClick={() => setSelectedDetailYear(item.year)}
+                        className="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold underline"
+                      >
+                        Lihat Detail
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredCostData.map((item) => {
-                    const isOver = item.actual > item.budget && item.budget > 0;
-                    return (
-                      <tr key={item.year} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 font-bold text-slate-700">{item.year}</td>
-                        <td className="py-3 text-center">
-                          {item.budget === 0 && item.actual === 0 ? (
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-bold">No Data</span>
-                          ) : isOver ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full text-[9px] font-bold border border-rose-100">
-                              <AlertTriangle className="w-3 h-3" /> Over Budget
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[9px] font-bold border border-emerald-100">
-                              <CheckCircle className="w-3 h-3" /> On Budget
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 text-right">
-                          <button
-                            onClick={() => setSelectedDetailYear(item.year)}
-                            className="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold underline"
-                          >
-                            Lihat Detail
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
-            <DollarSign className="w-8 h-8 opacity-30" />
-            <p className="text-sm font-medium">Tidak ada data cost hiring untuk tahun yang dipilih.</p>
-          </div>
-        )}
+                );
+              }) : (
+                <tr>
+                  <td colSpan={3} className="py-8 text-center text-slate-400 text-sm">
+                    Tidak ada data untuk tahun yang dipilih.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* 🔹 MODAL DETAIL COST HIRING (POP UP) */}
