@@ -1,8 +1,20 @@
-import React, { useMemo } from 'react';
-import {
-  Users, Briefcase, UserCheck, Stethoscope, FileCheck, Award, Activity, Clock, CalendarClock, ArrowUpRight, CheckCircle, TrendingUp, DollarSign, BarChart3, PieChart, LineChart
+import React from 'react';
+import { 
+  Users, 
+  Briefcase, 
+  UserCheck, 
+  Stethoscope, 
+  FileCheck, 
+  Activity, 
+  CalendarClock, 
+  Clock, 
+  ArrowUpRight,
+  TrendingUp,
+  Award,
+  CheckCircle
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
+import { RecruitmentCharts } from './RecruitmentCharts';
 
 interface DashboardViewProps {
   candidates: Candidate[];
@@ -18,13 +30,17 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  candidates, jobs, settings,
-  filterRange, setFilterRange,
-  filterYear, setFilterYear,
-  filterQuarters, setFilterQuarters,
+  candidates,
+  jobs,
+  settings,
+  filterRange,
+  setFilterRange,
+  filterYear,
+  setFilterYear,
+  filterQuarters,
+  setFilterQuarters,
   setActiveMenu
 }) => {
-
   const nowDate = new Date();
 
   // Derive available years from all candidate and job dates
@@ -47,6 +63,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const isWithinYearAndQuarter = (dateStr?: string) => {
     if (!dateStr) return false;
     const date = new Date(dateStr);
+
     // Year filter
     if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
 
@@ -72,7 +89,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (filterYear !== 0) {
       if (date.getFullYear() !== filterYear) return false;
     }
-
+    
     if (filterRange === 'month') {
       return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
     } else if (filterRange === '6months') {
@@ -125,6 +142,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const slaTableData = stages.map(stg => {
     const targetSetting = settings.targetSlaDays.find(t => t.stage === stg.key);
     const targetDays = targetSetting ? targetSetting.targetDays : 3;
+    
     let candidateCount = 0;
     let compliantCount = 0;
     let violationCount = 0;
@@ -186,9 +204,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const slaCompliantRate = totalSlaProcessed > 0 ? Math.round((totalCompliant / totalSlaProcessed) * 100) : 0;
 
   // Calculate Average Days to Hire - IMPROVED SAFETY
-  const hiredCandidates = displayCandidates.filter(c =>
-    c.tahapProses === 'hired' &&
-    c.tanggalHired &&
+  const hiredCandidates = displayCandidates.filter(c => 
+    c.tahapProses === 'hired' && 
+    c.tanggalHired && 
     c.tanggalApplied &&
     !isNaN(new Date(c.tanggalHired).getTime()) &&
     !isNaN(new Date(c.tanggalApplied).getTime())
@@ -208,7 +226,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const targetSlaPercent = slaCompliantRate; // Realisasi aktual dari data terfilter
   const slaGoalPercent = settings.targetSlaManagement ?? 85; // Target SLA dari pengaturan management
 
-  // 🔹 PERBAIKAN: Hitung Trend Dinamis vs Rata-Rata Historis
+    // 🔹 PERBAIKAN: Hitung Trend Dinamis vs Rata-Rata Historis
   // 1. Hitung total compliant & violation untuk SEMUA kandidat (tanpa filter waktu)
   let allTimeCompliant = 0;
   let allTimeViolation = 0;
@@ -217,7 +235,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     stages.forEach(stg => {
       const startVal = (c as any)[stg.startKey];
       const endVal = (c as any)[stg.endKey];
-
+      
       if (startVal && !isNaN(new Date(startVal).getTime())) {
         const targetSetting = settings.targetSlaDays.find(t => t.stage === stg.key);
         const targetDays = targetSetting ? targetSetting.targetDays : 3;
@@ -242,54 +260,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // 2. Hitung Trend (Selisih antara Rate Periode Ini vs Rate Historis)
   const slaTrend = slaCompliantRate - historicalSlaRate;
-
+  
   // Recent Applicants
   const recentApplicants = [...displayCandidates]
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
     .slice(0, 5);
 
-  // --- NEW: COST HIRING PER DEPARTMENT CALCULATION ---
-  const costHiringData = useMemo(() => {
-    // Group budgets by department for selected year
-    const deptBudgets = settings.budgetCostHiring
-      .filter(b => b.year === filterYear)
-      .reduce((acc, curr) => {
-        acc[curr.department] = curr.budget;
-        return acc;
-      }, {} as Record<string, number>);
-
-    // Calculate actual spending per department (sum of expectedSalary for hired candidates in that dept)
-    const deptActual = candidates
-      .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
-      .filter(c => {
-        const hireYear = new Date(c.tanggalHired).getFullYear();
-        return hireYear === filterYear;
-      })
-      .reduce((acc, curr) => {
-        // Simple matching: check if job title contains dept name or vice versa
-        const matchedDept = Object.keys(deptBudgets).find(dept => 
-          curr.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
-          dept.toLowerCase().includes(curr.posisiDilamar.toLowerCase())
-        );
-        
-        if (matchedDept) {
-          acc[matchedDept] = (acc[matchedDept] || 0) + (curr.expectedSalary || 0);
-        }
-        return acc;
-      }, {} as Record<string, number>);
-
-    // Combine into array for chart
-    return Object.keys(deptBudgets).map(dept => ({
-      department: dept,
-      budget: deptBudgets[dept] || 0,
-      actual: deptActual[dept] || 0,
-      remaining: (deptBudgets[dept] || 0) - (deptActual[dept] || 0)
-    })).sort((a, b) => b.budget - a.budget); // Sort by budget desc
-  }, [settings.budgetCostHiring, candidates, filterYear]);
-
   return (
     <div className="space-y-6">
-
       {/* Top Welcome & Filter controls */}
       <div className="bg-slate-900 text-white p-4 sm:p-6 rounded-2xl shadow-md space-y-4">
         {/* Row 1: Welcome + Period Filter */}
@@ -305,7 +283,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 key={range}
                 onClick={() => { setFilterRange(range); setFilterQuarters([]); }}
                 className={`px-2 sm:px-3 py-1.5 rounded text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap ${
-                  filterRange === range && filterQuarters.length === 0 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  filterRange === range && filterQuarters.length === 0
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 {range === 'month' ? 'Bulan Ini' : range === '6months' ? '6 Bulan' : 'Tahunan'}
@@ -341,7 +321,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               { q: 1, label: 'Q1', desc: 'Jan–Mar' },
               { q: 2, label: 'Q2', desc: 'Apr–Jun' },
               { q: 3, label: 'Q3', desc: 'Jul–Sep' },
-              { q: 4,  label: 'Q4', desc: 'Okt–Des' },
+              { q: 4, label: 'Q4', desc: 'Okt–Des' },
             ].map(({ q, label, desc }) => {
               const isActive = filterQuarters.includes(q);
               return (
@@ -356,7 +336,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   }`}
                 >
                   <span className={`w-3.5 h-3.5 flex items-center justify-center rounded border text-[8px] font-black shrink-0 ${
-                    isActive ? 'bg-white/20 border-white/40 text-white'  : 'border-slate-600'
+                    isActive ? 'bg-white/20 border-white/40 text-white' : 'border-slate-600'
                   }`}>
                     {isActive ? '✓' : ''}
                   </span>
@@ -474,215 +454,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* --- NEW SECTION: COST HIRING PER DEPARTMENT --- */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold text-slate-800 text-sm sm:text-base">Cost Hiring per Departemen</h3>
-            <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan budget alokasi vs pengeluaran riil ({filterYear})</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
-              <CheckCircle className="w-2.5 h-2.5" /> {filterYear}
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {costHiringData.length > 0 ? costHiringData.map((item, idx) => {
-            const percentUsed = item.budget > 0 ? Math.min(100, Math.round((item.actual / item.budget) * 100)) : 0;
-            const isOverBudget = item.actual > item.budget;
-            
-            return (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700">{item.department}</span>
-                  <span className={`${isOverBudget ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    Real: Rp {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(item.actual)} | Budg: Rp {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(item.budget)}
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <div 
-                    className={`h-2.5 rounded-full ${isOverBudget ? 'bg-rose-500' : 'bg-emerald-500'}`}
-                    style={{ width: `${percentUsed}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between text-[10px] text-slate-400">
-                  <span>{percentUsed}% digunakan</span>
-                  <span>Sisa: Rp {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(item.remaining)}</span>
-                </div>
-              </div>
-            );
-          }) : (
-            <div className="text-center py-8 text-slate-400 text-sm">
-              Belum ada data budget untuk tahun {filterYear}. Silakan konfigurasi di menu Settings.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recruitment Visualizations - Original Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Lowongans vs Hired per Department */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Lowongan vs Hired per Departemen</h3>
-              <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan posisi dibuka dan kandidat yang berhasil direkrut</p>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
-              <CheckCircle className="w-2.5 h-2.5" /> {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
-            </span>
-          </div>
-          <div className="h-[300px] flex items-end justify-around gap-2 pt-4 pb-2">
-            {/* Mock Data Visualization - Replace with real chart library later */}
-            {['Technology', 'Human Resources', 'Product Design', 'Marketing', 'Finance'].map((dept, i) => {
-              const openJobs = filteredJobs.filter(j => j.department === dept && j.status === 'Aktif').length;
-              const hiredCands = displayCandidates.filter(c => c.posisiDilamar.includes(dept) && c.tahapProses === 'hired').length;
-              const maxVal = Math.max(openJobs, hiredCands, 1);
-              
-              return (
-                <div key={dept} className="flex flex-col items-center gap-1 flex-1">
-                  <div className="flex items-end gap-1 h-[200px] w-full justify-center">
-                    <div 
-                      className="w-3 bg-indigo-500 rounded-t-sm"
-                      style={{ height: `${(openJobs / maxVal) * 100}%` }}
-                      title={`Lowongan: ${openJobs}`}
-                    ></div>
-                    <div 
-                      className="w-3 bg-emerald-500 rounded-t-sm"
-                      style={{ height: `${(hiredCands / maxVal) * 100}%` }}
-                      title={`Hired: ${hiredCands}`}
-                    ></div>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-600 truncate max-w-[80px]">{dept}</span>
-                  <span className="text-[9px] text-slate-400">{openJobs}/{hiredCands}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Tren Lowongan vs Rekrutmen */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Tren Lowongan vs Rekrutmen</h3>
-              <p className="text-slate-400 text-[11px] sm:text-xs">Statistik postingan lowongan vs rekrutan sukses</p>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
-              <CheckCircle className="w-2.5 h-2.5" /> {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
-            </span>
-          </div>
-          <div className="h-[300px] flex items-end justify-around gap-2 pt-4 pb-2">
-            {/* Mock Monthly Data - Replace with real time-series data */}
-            {['Des \'25', 'Jan \'26', 'Feb \'26', 'Mar \'26', 'Apr \'26', 'Mei \'26'].map((month, i) => {
-              const newJobs = Math.floor(Math.random() * 5); // Mock data
-              const newHires = Math.floor(Math.random() * 3); // Mock data
-              const maxVal = Math.max(newJobs, newHires, 1);
-              
-              return (
-                <div key={month} className="flex flex-col items-center gap-1 flex-1">
-                  <div className="flex items-end gap-1 h-[200px] w-full justify-center">
-                    <div 
-                      className="w-3 bg-blue-500 rounded-t-sm"
-                      style={{ height: `${(newJobs / maxVal) * 100}%` }}
-                      title={`Lowongan Baru: ${newJobs}`}
-                    ></div>
-                    <div 
-                      className="w-3 bg-purple-500 rounded-t-sm"
-                      style={{ height: `${(newHires / maxVal) * 100}%` }}
-                      title={`Kandidat Hired: ${newHires}`}
-                    ></div>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-600">{month}</span>
-                  <span className="text-[9px] text-slate-400">L{newJobs} H{newHires}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Pipeline Tahap Rekrutmen & Cost Hiring Side-by-Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pipeline Tahap Rekrutmen */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Pipeline Tahap Rekrutmen</h3>
-              <p className="text-slate-400 text-[11px] sm:text-xs">Volume kandidat aktif di setiap fase rekrutmen</p>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
-              <CheckCircle className="w-2.5 h-2.5" /> {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {['Applied', 'Screening', 'Interview', 'Assessment', 'Medical Check', 'Offering', 'Hired', 'Rejected'].map((stage, i) => {
-              const count = displayCandidates.filter(c => c.tahapProses.toLowerCase() === stage.toLowerCase()).length;
-              const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500', 'bg-teal-500', 'bg-emerald-500', 'bg-rose-500'];
-              const maxCount = Math.max(...['Applied', 'Screening', 'Interview', 'Assessment', 'Medical Check', 'Offering', 'Hired', 'Rejected'].map(s => 
-                displayCandidates.filter(c => c.tahapProses.toLowerCase() === s.toLowerCase()).length
-              ), 1);
-              
-              return (
-                <div key={stage} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-700">{stage}</span>
-                    <span className="text-slate-500">{count} Kandidat</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div 
-                      className={`h-2.5 rounded-full ${colors[i]}`}
-                      style={{ width: `${(count / maxCount) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Cost Hiring per Departemen - Already added above, but keeping placeholder for layout consistency */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Cost Hiring per Departemen</h3>
-              <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan budget alokasi vs pengeluaran riil</p>
-            </div>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
-              <CheckCircle className="w-2.5 h-2.5" /> {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
-            </span>
-          </div>
-          <div className="space-y-4">
-            {costHiringData.slice(0, 5).map((item, idx) => { // Show top 5 departments
-              const percentUsed = item.budget > 0 ? Math.min(100, Math.round((item.actual / item.budget) * 100)) : 0;
-              const isOverBudget = item.actual > item.budget;
-              
-              return (
-                <div key={idx} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-700">{item.department}</span>
-                    <span className={`${isOverBudget ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      Real: Rp {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(item.actual)} | Budg: Rp {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(item.budget)}
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div 
-                      className={`h-2.5 rounded-full ${isOverBudget ? 'bg-rose-500' : 'bg-emerald-500'}`}
-                      style={{ width: `${percentUsed}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>{percentUsed}% digunakan</span>
-                    <span>Sisa: Rp {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(item.remaining)}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Recruitment Visualizations */}
+      <RecruitmentCharts 
+        candidates={displayCandidates}
+        jobs={filteredJobs}
+        settings={settings}
+        filterRange={filterRange}
+        filterYear={filterYear}
+        filterQuarters={filterQuarters}
+      />
 
       {/* SLA Detail Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
@@ -739,7 +519,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0">
                           <div 
                             className={`h-full rounded-full ${
-                              row.status === 'OPTIMAL' ? 'bg-emerald-500' : row.status === 'WARNING' ? 'bg-amber-500' :  'bg-rose-500'
+                              row.status === 'OPTIMAL' ? 'bg-emerald-500' : row.status === 'WARNING' ? 'bg-amber-500' : 'bg-rose-500'
                             }`}
                             style={{ width: `${row.rate}%` }}
                           />
@@ -793,10 +573,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     applied: 'bg-blue-100 text-blue-800',
                     screening: 'bg-indigo-100 text-indigo-800',
                     interview: 'bg-purple-100 text-purple-800',
-                     assessment: 'bg-pink-100 text-pink-800',
+                    assessment: 'bg-pink-100 text-pink-800',
                     medical: 'bg-amber-100 text-amber-800',
                     offering: 'bg-teal-100 text-teal-800',
-                     hired: 'bg-emerald-100 text-emerald-800',
+                    hired: 'bg-emerald-100 text-emerald-800',
                     rejected: 'bg-rose-100 text-rose-800'
                   };
                   return (
@@ -832,7 +612,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </table>
         </div>
       </div>
-
     </div>
   );
 };
