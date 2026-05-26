@@ -94,7 +94,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const offeringCount = displayCandidates.filter(c => c.tahapProses === 'offering').length;
   const hiredCount = displayCandidates.filter(c => c.tahapProses === 'hired').length;
 
-  // --- SLA CALCULATION ---
+  // --- SLA TABLE CALCULATION ---
   const stages = [
     { key: 'screening', label: 'Screening', startKey: 'tanggalApplied', endKey: 'tanggalScreening' },
     { key: 'interview', label: 'Interview', startKey: 'tanggalScreening', endKey: 'tanggalInterview' },
@@ -151,9 +151,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     averageDaysToHire = parseFloat((totalDays / hiredCandidates.length).toFixed(1));
   }
 
-  const averageTargetSla = settings.targetSlaDays.length > 0 
-    ? settings.targetSlaDays.reduce((sum, s) => sum + s.targetDays, 0) / settings.targetSlaDays.length 
-    : 3;
+  const averageTargetSla = settings.targetSlaDays.length > 0
+    ? settings.targetSlaDays.reduce((sum, s) => sum + s.targetDays, 0) / settings.targetSlaDays.length : 3;
   const targetSlaPercent = slaCompliantRate;
   const slaGoalPercent = settings.targetSlaManagement ?? 85;
 
@@ -185,13 +184,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // --- 🔹 COST HIRING CLUSTER BAR CHART DATA ---
   const costHiringData = useMemo(() => {
-    // 1. Aggregate Budget from Settings per Year
     const budgetByYear = settings.budgetCostHiring.reduce((acc, item) => {
       acc[item.year] = (acc[item.year] || 0) + item.budget;
       return acc;
     }, {} as Record<number, number>);
 
-    // 2. Calculate Actual Spending Manually from Hired Candidates per Year
     const actualByYear = candidates
       .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
       .reduce((acc, c) => {
@@ -200,10 +197,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         return acc;
       }, {} as Record<number, number>);
 
-    // 3. Merge into chart data array
     const years = Array.from(new Set([...Object.keys(budgetByYear), ...Object.keys(actualByYear)]))
-      .map(Number)
-      .sort((a, b) => a - b);
+      .map(Number).sort((a, b) => a - b);
 
     return years.map(year => ({
       year,
@@ -370,7 +365,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 🔹 NEW: COST HIRING CLUSTER BAR CHART */}
+      {/* Recruitment Visualizations */}
+      <RecruitmentCharts
+        candidates={displayCandidates}
+        jobs={filteredJobs}
+        settings={settings}
+        filterRange={filterRange}
+        filterYear={filterYear}
+        filterQuarters={filterQuarters}
+      />
+
+      {/* 🔹 COST HIRING CLUSTER BAR CHART — DI ATAS TABEL SLA */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -387,7 +392,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {costHiringData.length > 0 ? (
           <div className="space-y-6">
-            {/* Chart Area */}
             <div className="relative h-64 flex items-end gap-4 sm:gap-8 border-b border-l border-slate-200 pl-2 pb-2">
               {/* Y-Axis Grid Lines */}
               <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
@@ -424,14 +428,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     {/* Cluster Bars */}
                     <div className="flex items-end gap-1 sm:gap-2 w-full justify-center h-full">
-                      {/* Budget Bar */}
                       <div className="relative flex flex-col items-center justify-end h-full">
                         <div
                           className="w-6 sm:w-10 bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500"
                           style={{ height: `${Math.max(budgetHeight, 0.5)}%` }}
                         ></div>
                       </div>
-                      {/* Actual Bar */}
                       <div className="relative flex flex-col items-center justify-end h-full">
                         <div
                           className={`w-6 sm:w-10 rounded-t-md transition-all duration-500 ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
@@ -498,16 +500,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         )}
       </div>
-
-      {/* Recruitment Visualizations */}
-      <RecruitmentCharts
-        candidates={displayCandidates}
-        jobs={filteredJobs}
-        settings={settings}
-        filterRange={filterRange}
-        filterYear={filterYear}
-        filterQuarters={filterQuarters}
-      />
 
       {/* SLA Detail Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
