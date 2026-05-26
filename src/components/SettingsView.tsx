@@ -4,7 +4,7 @@ import {
   Users, Plus, Edit3, Trash2, ShieldCheck, X, Target, MessageCircle,
   Eye, EyeOff, Lock, ChevronDown
 } from 'lucide-react';
-import { AppSettings, SlaSetting, AdminRole } from '../data/mockData';
+import { AppSettings, SlaSetting, AdminRole, BudgetSetting } from '../data/mockData';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -20,23 +20,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [targetSlaDays, setTargetSlaDays] = useState<SlaSetting[]>([...settings.targetSlaDays]);
   const [targetSlaManagement, setTargetSlaManagement] = useState(settings.targetSlaManagement ?? 85);
   
-  // Budget Settings with Migration Support for older data without 'year'
-  const [deptBudgets, setDeptBudgets] = useState(
-    settings.budgetCostHiring.map(b => ({ 
-      ...b, 
-      year: b.year || 2025, // Default to 2025 if year is missing
-      budget: b.budget ?? 0 
-    }))
+  // Department Budgets State
+  // Ensure each item has a year (default to current year if missing for legacy data)
+  const [deptBudgets, setDeptBudgets] = useState<BudgetSetting[]>(
+    settings.budgetCostHiring.map(b => ({ ...b, year: b.year || new Date().getFullYear() }))
   );
   
-  // Filter Year for Budget Table (Default 2025 as requested)
-  const [selectedBudgetYear, setSelectedBudgetYear] = useState<number>(2025);
-  
-  // Extract unique years from existing budgets + standard future years
-  const availableYears = Array.from(new Set([2025, 2026, 2027, ...deptBudgets.map(b => b.year)])).sort();
-
-  // Other Settings
-  const [adminRoles, setAdminRoles] = useState<AdminRole[]>(settings.adminRoles.map((role) => ({ ...role })));
+  const [adminRoles, setAdminRoles] = useState<AdminRole[]>(
+    settings.adminRoles.map((role) => ({ ...role }))
+  );
   const [infoPortal, setInfoPortal] = useState<AppSettings['infoPortal']>({ ...settings.infoPortal });
   
   const [emailSettings, setEmailSettings] = useState<AppSettings['emailSettings']>({
@@ -52,20 +44,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   });
   
   const [activeEmailTemplate, setActiveEmailTemplate] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
-  const [whatsappSettings, setWhatsappSettings] = useState<AppSettings['whatsappSettings']>({ ...settings.whatsappSettings });
+  const [whatsappSettings, setWhatsappSettings] = useState<AppSettings['whatsappSettings']>({
+    ...settings.whatsappSettings
+  });
   
-  // UI States
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveSection, setSaveSection] = useState('');
+
+  // Modal States
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  
+  // Budget Modal State
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
-  
-  // Modal Form States
+  const [editingBudgetKey, setEditingBudgetKey] = useState<string | null>(null); // Key format: "DeptName-Year"
   const [newDeptName, setNewDeptName] = useState('');
-  const [newDeptYear, setNewDeptYear] = useState<number>(2025); // Default 2025
-  const [newDeptBudget, setNewDeptBudget] = useState<number>(0); // Default 0
-  
+  const [newDeptYear, setNewDeptYear] = useState<number>(new Date().getFullYear());
+  const [newDeptBudget, setNewDeptBudget] = useState<number>(0);
+
+  // Role Form State
   const [roleFormName, setRoleFormName] = useState('');
   const [roleFormAccess, setRoleFormAccess] = useState<AdminRole['accessLevel']>('Recruiter');
   const [roleFormStatus, setRoleFormStatus] = useState<AdminRole['status']>('Active');
@@ -79,7 +76,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   // --- HELPER FUNCTIONS ---
 
-  // Sanitize number input: remove non-digits, remove leading zeros
+  // Sanitize number input (remove leading zeros)
   const sanitizeNumberInput = (value: string): string => {
     let cleaned = value.replace(/[^\d]/g, '');
     if (cleaned.startsWith('0') && cleaned.length > 1) {
@@ -88,37 +85,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     return cleaned;
   };
 
-  const formatRupiah = (num: number) => 
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
-
-  // --- HANDLERS ---
-
   const handleSlaChange = (stage: string, val: number) => {
     setTargetSlaDays(prev =>
       prev.map(item => item.stage === stage ? { ...item, targetDays: Number(val) } : item)
     );
   };
 
-  const handleBudgetChange = (dept: string, year: number, rawValue: string) => {
-    const sanitized = sanitizeNumberInput(rawValue);
-    const numVal = sanitized === '' ? 0 : Number(sanitized);
-    
-    setDeptBudgets(prev =>
-      prev.map(item => 
-        (item.department === dept && item.year === year) 
-          ? { ...item, budget: numVal } 
-          : item
-      )
-    );
-  };
-
-  const syncBudgetsToParent = (updatedBudgets: typeof deptBudgets) => {
+  // Sync settings to parent
+  const syncSettingsToParent = () => {
     onUpdateSettings({
       autoScreeningATS,
       syncGoogleCalendar,
       targetSlaDays,
       targetSlaManagement,
-      budgetCostHiring: updatedBudgets,
+      budgetCostHiring: deptBudgets,
       adminRoles,
       infoPortal,
       emailSettings,
@@ -126,47 +106,76 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     });
   };
 
-  const handleAddDeptBudget = (e: React.FormEvent) => {
+  // --- BUDGET CRUD LOGIC ---
+
+  const openAddBudgetModal = () => {
+    setEditingBudgetKey(null);
+    setNewDeptName('');
+    setNewDeptYear(new Date().getFullYear());
+    setNewDeptBudget(0);
+    setIsBudgetModalOpen(true);
+  };
+
+  const openEditBudgetModal = (dept: string, year: number, budget: number) => {
+    setEditingBudgetKey(`${dept}-${year}`);
+    setNewDeptName(dept);
+    setNewDeptYear(year);
+    setNewDeptBudget(budget);
+    setIsBudgetModalOpen(true);
+  };
+
+  const handleSaveBudget = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeptName.trim()) return;
-    
+
     const trimmedName = newDeptName.trim();
-    
-    // Check duplicate for specific year
-    if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase() && d.year === newDeptYear)) {
-      alert(`Departemen "${trimmedName}" sudah ada untuk tahun ${newDeptYear}!`);
+    const currentKey = `${trimmedName}-${newDeptYear}`;
+
+    // Check for duplicates (unless we are editing the same item)
+    const isDuplicate = deptBudgets.some(b => 
+      b.department.toLowerCase() === trimmedName.toLowerCase() && 
+      b.year === newDeptYear && 
+      `${b.department}-${b.year}` !== editingBudgetKey
+    );
+
+    if (isDuplicate) {
+      alert(`Budget untuk departemen "${trimmedName}" pada tahun ${newDeptYear} sudah ada!`);
       return;
     }
 
-    const newEntry = { 
-      department: trimmedName, 
-      year: newDeptYear, 
-      budget: newDeptBudget, 
-      actual: 0 
-    };
-    
-    const nextBudgets = [...deptBudgets, newEntry];
-    setDeptBudgets(nextBudgets);
-    syncBudgetsToParent(nextBudgets);
-    
-    // Reset Form
-    setNewDeptName('');
-    setNewDeptYear(2025);
-    setNewDeptBudget(0);
+    if (editingBudgetKey) {
+      // UPDATE Existing
+      setDeptBudgets(prev => prev.map(b => 
+        (b.department === newDeptName && b.year === newDeptYear)
+          ? { ...b, budget: newDeptBudget }
+          : b
+      ));
+    } else {
+      // CREATE New
+      const newEntry = { 
+        department: trimmedName, 
+        year: newDeptYear, 
+        budget: newDeptBudget, 
+        actual: 0 
+      };
+      setDeptBudgets(prev => [...prev, newEntry]);
+    }
+
+    syncSettingsToParent();
     setIsBudgetModalOpen(false);
     
-    setSaveSection('Departemen Baru');
+    setSaveSection(editingBudgetKey ? 'Update Budget' : 'Tambah Budget');
     setSaveSuccess(true);
     setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
   };
 
-  const handleRemoveDeptBudget = (deptName: string, year: number) => {
-    if (!window.confirm(`Hapus budget untuk "${deptName}" di tahun ${year}?`)) return;
-    
-    const nextBudgets = deptBudgets.filter(d => !(d.department === deptName && d.year === year));
-    setDeptBudgets(nextBudgets);
-    syncBudgetsToParent(nextBudgets);
+  const handleRemoveBudget = (dept: string, year: number) => {
+    if (!window.confirm(`Hapus budget untuk "${dept}" tahun ${year}?`)) return;
+    setDeptBudgets(prev => prev.filter(b => !(b.department === dept && b.year === year)));
+    syncSettingsToParent();
   };
+
+  // --- ROLE CRUD LOGIC ---
 
   const resetRoleForm = () => {
     setEditingRoleId(null);
@@ -225,36 +234,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     setAdminRoles((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleSave = (e: React.FormEvent, section: string = 'Semua') => {
+  const handleSaveGlobal = (e: React.FormEvent, section: string = 'Semua') => {
     e.preventDefault();
-    
-    // Optional Validation before save
-    const invalidSla = targetSlaDays.find(item => item.targetDays < 1);
-    if (invalidSla) {
-      alert(`⚠️ Target SLA tahap "${invalidSla.stage}" tidak boleh kurang dari 1 hari.`);
-      return;
-    }
-
-    const updatedSettings: AppSettings = {
-      autoScreeningATS,
-      syncGoogleCalendar,
-      targetSlaDays,
-      targetSlaManagement,
-      budgetCostHiring: deptBudgets,
-      adminRoles,
-      infoPortal,
-      emailSettings,
-      whatsappSettings
-    };
-
-    onUpdateSettings(updatedSettings);
+    syncSettingsToParent();
     setSaveSection(section);
     setSaveSuccess(true);
     setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
   };
 
-  // --- RENDER HELPERS ---
-  const numberInputClass = "w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+  // Format Currency Helper
+  const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
   return (
     <div className="space-y-6">
@@ -271,7 +260,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {saveSuccess && (
         <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-xl flex items-center gap-3 animate-fade-in text-xs font-bold shadow-sm">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>Konfigurasi {saveSection} berhasil disimpan dan audit log perubahan telah dicatat!</span>
+          <span>Konfigurasi {saveSection} berhasil disimpan!</span>
         </div>
       )}
 
@@ -295,7 +284,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button onClick={(e) => handleSave(e, 'Skrining ATS')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
+            <button onClick={(e) => handleSaveGlobal(e, 'Skrining ATS')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
               <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
             </button>
           </div>
@@ -318,7 +307,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button onClick={(e) => handleSave(e, 'Integrasi Kalender')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
+            <button onClick={(e) => handleSaveGlobal(e, 'Integrasi Kalender')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
               <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
             </button>
           </div>
@@ -341,17 +330,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     value={item.targetDays === 0 ? '' : item.targetDays.toString()}
                     onChange={(e) => {
                       const val = sanitizeNumberInput(e.target.value);
-                      handleSlaChange(item.stage, val === '' ? 0 : Number(val));
+                      setTargetSlaDays(prev => prev.map(i => i.stage === item.stage ? { ...i, targetDays: val === '' ? 0 : Number(val) } : i));
                     }}
                     placeholder="0"
-                    className={numberInputClass}
+                    className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               ))}
             </div>
           </div>
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button onClick={(e) => handleSave(e, 'Target SLA')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
+            <button onClick={(e) => handleSaveGlobal(e, 'Target SLA')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
               <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
             </button>
           </div>
@@ -389,117 +378,84 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button onClick={(e) => handleSave(e, 'Target SLA Management')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
+            <button onClick={(e) => handleSaveGlobal(e, 'Target SLA Management')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
               <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
             </button>
           </div>
         </div>
 
-        {/* Card 3: Budget Cost Hiring per Department (MULTI-YEAR TABLE) */}
+        {/* Card 3: Budget Cost Hiring per Department (TABLE VIEW WITH EDIT) */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 lg:col-span-2 flex flex-col">
           <div className="space-y-4 flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2 text-slate-800 font-extrabold text-sm">
-                <DollarSign className="w-4 h-4 text-indigo-600" /> <h3>Budget Cost Hiring per Departemen (Multi-Tahun)</h3>
+                <DollarSign className="w-4 h-4 text-indigo-600" />
+                <h3>Budget Cost Hiring per Departemen (Multi-Tahun)</h3>
               </div>
-              <div className="flex items-center gap-2 self-start sm:self-auto">
-                <div className="relative">
-                  <select
-                    value={selectedBudgetYear}
-                    onChange={(e) => setSelectedBudgetYear(Number(e.target.value))}
-                    className="appearance-none pl-3 pr-8 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer"
-                  >
-                    {availableYears.map(year => (<option key={year} value={year}>{year}</option>))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                </div>
-                <button onClick={() => setIsBudgetModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100">
-                  <Plus className="w-3.5 h-3.5" /> Tambah Departemen + Tahun
-                </button>
-              </div>
+              <button
+                onClick={openAddBudgetModal}
+                className="inline-flex items-center gap-2 self-start rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
+              >
+                <Plus className="w-3.5 h-3.5" /> Tambah / Edit Budget
+              </button>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">Atur batas budget tahunan untuk perekrutan per divisi.</p>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Atur batas budget tahunan untuk perekrutan per divisi. Klik tombol Edit untuk mengubah nilai budget dinamis.
+            </p>
 
-            {/* MULTI-YEAR TABLE STRUCTURE */}
+            {/* TABLE BUDGET */}
             <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[1200px] text-left text-xs border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider">
                   <tr>
-                    <th rowSpan={2} className="p-3 border-b border-r border-slate-200 font-bold w-12 text-center">No</th>
-                    <th rowSpan={2} className="p-3 border-b border-r border-slate-200 font-bold">Departemen</th>
-                    
-                    {/* Dynamic Years Headers */}
-                    {[2025, 2026, 2027].map(year => (
-                      <th key={year} colSpan={3} className="p-2 border-b border-r border-slate-200 font-bold text-center bg-indigo-50/50">{year}</th>
-                    ))}
-                    
-                    <th rowSpan={2} className="p-3 border-b border-slate-200 font-bold text-center w-24">Aksi</th>
-                  </tr>
-                  <tr>
-                    {/* Sub-headers for each year */}
-                    {[2025, 2026, 2027].flatMap(year => [
-                      <th key={`${year}-budget`} className="p-2 border-b border-r border-slate-200 font-semibold text-center">Budget</th>,
-                      <th key={`${year}-actual`} className="p-2 border-b border-r border-slate-200 font-semibold text-center">Actual</th>,
-                      <th key={`${year}-remaining`} className="p-2 border-b border-r border-slate-200 font-semibold text-center">Sisa</th>
-                    ])}
+                    <th className="p-3 border-b border-r border-slate-200 font-bold">Departemen</th>
+                    <th className="p-3 border-b border-r border-slate-200 font-bold text-center">Tahun</th>
+                    <th className="p-3 border-b border-r border-slate-200 font-bold">Budget (IDR)</th>
+                    <th className="p-3 border-b border-r border-slate-200 font-bold text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {deptBudgets.length > 0 ? (
-                    // Group by Department Name to show one row per dept with multiple year columns
-                    Array.from(new Set(deptBudgets.map(b => b.department))).map((deptName, index) => {
-                      const getBudgetForYear = (year: number) => 
-                        deptBudgets.find(b => b.department === deptName && b.year === year) || { department: deptName, year, budget: 0, actual: 0 };
-
-                      return (
-                        <tr key={deptName} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="p-3 text-center font-medium text-slate-500 align-middle border-r border-slate-100">{index + 1}</td>
-                          <td className="p-3 font-bold text-slate-800 align-middle border-r border-slate-100">{deptName}</td>
-                          
-                          {[2025, 2026, 2027].map(year => {
-                            const data = getBudgetForYear(year);
-                            const remaining = data.budget - data.actual;
-                            return (
-                              <React.Fragment key={year}>
-                                <td className="p-2 border-r border-slate-100 align-middle">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={data.budget === 0 ? '' : data.budget.toString()}
-                                    onChange={(e) => handleBudgetChange(deptName, year, e.target.value)}
-                                    placeholder="0"
-                                    className="w-full text-center text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  />
-                                </td>
-                                <td className="p-2 text-center text-slate-600 font-medium border-r border-slate-100 align-middle">{formatRupiah(data.actual)}</td>
-                                <td className={`p-2 text-center font-bold border-r border-slate-100 align-middle ${remaining < 0 ? 'text-rose-600' : remaining < data.budget * 0.2 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                  {formatRupiah(remaining)}
-                                </td>
-                              </React.Fragment>
-                            );
-                          })}
-
-                          <td className="p-2 text-center align-middle">
-                            <button
-                              onClick={() => handleRemoveDeptBudget(deptName, selectedBudgetYear)} // Simplified delete action for demo, ideally delete all years or specific year
-                              className="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50 transition-colors"
-                              title="Hapus Data Departemen Ini"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 mx-auto" />
-                            </button>
+                    deptBudgets
+                      .sort((a, b) => b.year - a.year || a.department.localeCompare(b.department))
+                      .map((item, idx) => (
+                        <tr key={`${item.department}-${item.year}`} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-3 font-bold text-slate-800">{item.department}</td>
+                          <td className="p-3 text-center text-slate-600">{item.year}</td>
+                          <td className="p-3 text-slate-700 font-medium">{formatIDR(item.budget)}</td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => openEditBudgetModal(item.department, item.year, item.budget)}
+                                className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                title="Edit Budget"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveBudget(item.department, item.year)}
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                title="Hapus Entry"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      );
-                    })
+                      ))
                   ) : (
-                    <tr><td colSpan={13} className="p-8 text-center text-slate-400 font-medium">Belum ada alokasi budget. Silakan tambah departemen baru.</td></tr>
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-slate-400 font-medium">
+                        Belum ada data budget. Silakan tambah departemen baru.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button onClick={(e) => handleSave(e, 'Budget Departemen')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
+            <button onClick={(e) => handleSaveGlobal(e, 'Budget Departemen')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all">
               <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
             </button>
           </div>
@@ -539,7 +495,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-            <button onClick={(e) => handleSave(e, 'Info Portal')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button>
+            <button onClick={(e) => handleSaveGlobal(e, 'Info Portal')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button>
           </div>
         </div>
 
@@ -567,7 +523,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </table>
             </div>
           </div>
-          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end"><button onClick={(e) => handleSave(e, 'Role Admin')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button></div>
+          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end"><button onClick={(e) => handleSaveGlobal(e, 'Role Admin')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button></div>
         </div>
 
         {/* Card 6: Email Settings */}
@@ -587,7 +543,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               <div><label className="text-[11px] font-bold text-slate-600 block mb-1">Isi Email (Body)</label><textarea value={emailSettings.templates[activeEmailTemplate].body} onChange={(e) => setEmailSettings({ ...emailSettings, templates: { ...emailSettings.templates, [activeEmailTemplate]: { ...emailSettings.templates[activeEmailTemplate], body: e.target.value } } })} rows={8} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 resize-none" placeholder="Isi email..." /><p className="text-[10px] text-slate-400 mt-1">Variabel yang tersedia: {'{nama}'}, {'{posisi}'}, {'{email}'}, {'{telepon}'}</p></div>
             </div>
           </div>
-          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end"><button onClick={(e) => handleSave(e, 'Email Rekrutmen')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button></div>
+          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end"><button onClick={(e) => handleSaveGlobal(e, 'Email Rekrutmen')} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button></div>
         </div>
 
         {/* Card 7: WhatsApp Settings */}
@@ -600,40 +556,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-900"><p className="font-bold mb-1">Preview Singkat:</p><p className="whitespace-pre-wrap leading-relaxed">{whatsappSettings.confirmationTemplate}</p></div>
             </div>
           </div>
-          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end"><button onClick={(e) => handleSave(e, 'WhatsApp Konfirmasi')} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button></div>
+          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end"><button onClick={(e) => handleSaveGlobal(e, 'WhatsApp Konfirmasi')} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 text-xs transition-all"><Save className="w-3.5 h-3.5" /> Simpan Konfigurasi</button></div>
         </div>
       </div>
 
-      {/* MODAL: Add Department Budget */}
+      {/* MODAL: Add/Edit Budget */}
       {isBudgetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5 sm:p-6">
-              <div><h4 className="text-lg font-extrabold text-slate-800">Tambah Departemen + Tahun</h4><p className="text-xs text-slate-400">Buat alokasi budget untuk departemen baru pada tahun tertentu.</p></div>
-              <button onClick={() => { setNewDeptName(''); setNewDeptYear(2025); setNewDeptBudget(0); setIsBudgetModalOpen(false); }} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"><X className="w-5 h-5" /></button>
+              <div>
+                <h4 className="text-lg font-extrabold text-slate-800">{editingBudgetKey ? 'Edit Budget' : 'Tambah Budget Baru'}</h4>
+                <p className="text-xs text-slate-400">{editingBudgetKey ? 'Ubah alokasi budget untuk departemen dan tahun tertentu.' : 'Buat alokasi budget untuk departemen baru pada tahun tertentu.'}</p>
+              </div>
+              <button onClick={() => setIsBudgetModalOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleAddDeptBudget} className="space-y-4 p-5 sm:p-6">
+            <form onSubmit={handleSaveBudget} className="space-y-4 p-5 sm:p-6">
               <div><label className="mb-1 block text-xs font-bold text-slate-600">Nama Departemen</label><input type="text" required value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none" placeholder="Contoh: Finance" /></div>
               
-              {/* Year Input with Anti-Leading-Zero */}
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-600">Tahun Anggaran</label>
                 <input
-                  type="text"
-                  inputMode="numeric"
+                  type="number"
+                  min="2020"
+                  max="2100"
                   required
-                  value={newDeptYear === 0 ? '' : newDeptYear.toString()}
-                  onChange={(e) => {
-                    const val = sanitizeNumberInput(e.target.value);
-                    setNewDeptYear(val === '' ? 0 : Number(val));
-                  }}
+                  value={newDeptYear}
+                  onChange={(e) => setNewDeptYear(Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="2025"
+                  placeholder="2026"
                 />
-                <p className="text-[9px] text-slate-400 mt-1">Masukkan tahun (misal: 2025, 2026)</p>
               </div>
 
-              {/* Budget Input with Anti-Leading-Zero */}
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-600">Alokasi Budget (IDR)</label>
                 <div className="relative">
@@ -653,8 +607,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 </div>
               </div>
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 mt-2">
-                <button type="button" onClick={() => { setNewDeptName(''); setNewDeptYear(2025); setNewDeptBudget(0); setIsBudgetModalOpen(false); }} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100">Batal</button>
-                <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700">Tambah</button>
+                <button type="button" onClick={() => setIsBudgetModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100">Batal</button>
+                <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700">{editingBudgetKey ? 'Simpan Perubahan' : 'Tambah'}</button>
               </div>
             </form>
           </div>
