@@ -61,7 +61,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
-  const [newDeptBudget, setNewDeptBudget] = useState(10000000);
+  const [newDeptBudget, setNewDeptBudget] = useState(1000000); // min 1 juta
   const [roleFormName, setRoleFormName] = useState('');
   const [roleFormAccess, setRoleFormAccess] = useState<AdminRole['accessLevel']>('Recruiter');
   const [roleFormStatus, setRoleFormStatus] = useState<AdminRole['status']>('Active');
@@ -79,16 +79,61 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [roleFormPassword, setRoleFormPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSlaChange = (stage: string, val: number) => {
+  // 🔹 VALIDATION HELPER: Sanitize number input (no leading zero, clamp range)
+  const sanitizeNumberInput = (value: string, min: number, max: number): number => {
+    // Remove non-digit characters except minus (we don’t use negative here)
+    let cleaned = value.replace(/[^\d]/g, '');
+    // Prevent leading zero (e.g., "03" → "3", "007" → "7")
+    if (cleaned.startsWith('0') && cleaned.length > 1) {
+      cleaned = cleaned.replace(/^0+/, ''); // remove all leading zeros
+    }
+    // If empty or invalid, return default min
+    if (!cleaned || isNaN(Number(cleaned))) return min;
+    const num = Number(cleaned);
+    return Math.max(min, Math.min(max, num));
+  };
+
+  // 🔹 SLA Handler: enforce 1–30 days, no leading zero
+  const handleSlaChange = (stage: string, rawValue: string) => {
+    const val = sanitizeNumberInput(rawValue, 1, 30);
     setTargetSlaDays(prev =>
-      prev.map(item => item.stage === stage ? { ...item, targetDays: Number(val) } : item)
+      prev.map(item => item.stage === stage ? { ...item, targetDays: val } : item)
     );
   };
 
-  const handleBudgetChange = (dept: string, val: number) => {
+  // 🔹 Budget Handler: enforce 1,000,000–9,999,999,999 IDR, no leading zero
+  const handleBudgetChange = (dept: string, rawValue: string) => {
+    const val = sanitizeNumberInput(rawValue, 1000000, 9999999999);
     setDeptBudgets(prev =>
-      prev.map(item => item.department === dept ? { ...item, budget: Number(val) } : item)
+      prev.map(item => item.department === dept ? { ...item, budget: val } : item)
     );
+  };
+
+  // 🔹 Budget Modal handler (same logic)
+  const handleAddDeptBudget = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeptName.trim()) return;
+
+    const trimmedName = newDeptName.trim();
+    if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase())) {
+      alert("Departemen sudah ada!");
+      return;
+    }
+
+    const budgetVal = sanitizeNumberInput(newDeptBudget.toString(), 1000000, 9999999999);
+    const newEntry = { department: trimmedName, budget: budgetVal, actual: 0 };
+    const nextBudgets = [...deptBudgets, newEntry];
+
+    setDeptBudgets(nextBudgets);
+    syncBudgetsToParent(nextBudgets);
+
+    setNewDeptName('');
+    setNewDeptBudget(1000000);
+    setIsBudgetModalOpen(false);
+
+    setSaveSection('Departemen Baru');
+    setSaveSuccess(true);
+    setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
   };
 
   // Build a complete settings snapshot with overridden budgets, then broadcast to parent
@@ -106,41 +151,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     });
   };
 
-  const handleAddDeptBudget = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDeptName.trim()) return;
-
-    const trimmedName = newDeptName.trim();
-
-    // Check if already exists
-    if (deptBudgets.some(d => d.department.toLowerCase() === trimmedName.toLowerCase())) {
-      alert("Departemen sudah ada!");
-      return;
-    }
-
-    const newEntry = { department: trimmedName, budget: newDeptBudget, actual: 0 };
-    const nextBudgets = [...deptBudgets, newEntry];
-
-    // Update local state
-    setDeptBudgets(nextBudgets);
-
-    // Immediately broadcast to parent so charts / dashboard sync
-    syncBudgetsToParent(nextBudgets);
-
-    setNewDeptName('');
-    setNewDeptBudget(10000000);
-    setIsBudgetModalOpen(false);
-
-    // Show brief success notification
-    setSaveSection('Departemen Baru');
-    setSaveSuccess(true);
-    setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
-  };
-
   const handleRemoveDeptBudget = (deptName: string) => {
     const nextBudgets = deptBudgets.filter(d => d.department !== deptName);
     setDeptBudgets(nextBudgets);
-    // Immediately broadcast to parent so charts / dashboard sync
     syncBudgetsToParent(nextBudgets);
   };
 
@@ -150,10 +163,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     setRoleFormAccess('Recruiter');
     setRoleFormStatus('Active');
     setRoleFormDescription('');
-    setRoleFormPassword('');
     setRoleFormPermissions({
-      create: false, review: true, update: false, delete: false, email: true, whatsapp: false, lockSettings: false, lockHistory: false
+      create: false,
+      review: true,
+      update: false,
+      delete: false,
+      email: true,
+      whatsapp: false,
+      lockSettings: false,
+      lockHistory: false
     });
+    setRoleFormPassword('');
     setShowPassword(false);
   };
 
@@ -193,7 +213,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       if (editingRoleId) {
         return prev.map((item) => (item.id === editingRoleId ? nextRole : item));
       }
-
       return [nextRole, ...prev];
     });
 
@@ -281,17 +300,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 />
               </div>
             </div>
+          </div>
 
-            {/* Save Button for Card 1 */}
-            <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-              <button
-                type="button"
-                onClick={(e) => handleSave(e, 'Skrining ATS')}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
-              >
-                <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
-              </button>
-            </div>
+          {/* Save Button for Card 1 */}
+          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
+            <button
+              type="button"
+              onClick={(e) => handleSave(e, 'Skrining ATS')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
+            >
+              <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
+            </button>
           </div>
         </div>
 
@@ -323,21 +342,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Save Button for Card 1B */}
-            <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
-              <button
-                type="button"
-                onClick={(e) => handleSave(e, 'Integrasi Kalender')}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
-              >
-                <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
-              </button>
-            </div>
+          <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
+            <button
+              type="button"
+              onClick={(e) => handleSave(e, 'Integrasi Kalender')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 text-xs transition-all"
+            >
+              <Save className="w-3.5 h-3.5" /> Simpan Konfigurasi
+            </button>
           </div>
         </div>
 
-        {/* Card 2: Pengaturan Target SLA (Proses Rekrutmen) — ✅ PERUBAHAN DI SINI */}
+        {/* Card 2: Pengaturan Target SLA (Proses Rekrutmen) */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 flex flex-col">
           <div className="space-y-4 flex-1">
             <div className="flex items-center gap-2 text-slate-800 font-extrabold text-sm border-b border-slate-100 pb-2">
@@ -355,12 +373,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     {item.stage === 'medical' ? 'Medical Check' : item.stage} (Hari)
                   </label>
                   <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={item.targetDays}
-                    onChange={(e) => handleSlaChange(item.stage, Number(e.target.value))}
+                    type="text"
+                    value={item.targetDays.toString()}
+                    onChange={(e) => handleSlaChange(item.stage, e.target.value)}
                     className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="1"
                   />
                 </div>
               ))}
@@ -421,10 +438,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500 font-medium">Kategori Target:</span>
                   <span className={`font-bold px-2 py-0.5 rounded-md text-[10px] ${
-                    targetSlaManagement >= 90 
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                      : targetSlaManagement >= 75 
-                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' 
+                    targetSlaManagement >= 90
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                      : targetSlaManagement >= 75
+                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
                         : 'bg-amber-50 text-amber-700 border border-amber-100'
                   }`}>
                     {targetSlaManagement >= 90 ? 'STRICT' : targetSlaManagement >= 75 ? 'STANDARD' : 'RELAXED'}
@@ -495,10 +512,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   <div className="relative">
                     <span className="absolute left-2.5 top-2.5 text-xs text-slate-400 font-bold">Rp</span>
                     <input
-                      type="number"
-                      value={dept.budget}
-                      onChange={(e) => handleBudgetChange(dept.department, Number(e.target.value))}
+                      type="text"
+                      value={dept.budget.toString()}
+                      onChange={(e) => handleBudgetChange(dept.department, e.target.value)}
                       className="w-full text-xs font-bold pl-8 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      placeholder="1000000"
                     />
                   </div>
                 </div>
@@ -511,6 +529,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
 
+          {/* Save Button for Card 3 */}
           <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
             <button
               type="button"
@@ -697,7 +716,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       <td className="p-4 text-slate-600">{role.accessLevel}</td>
                       <td className="p-4">
                         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                          role.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                          role.status === 'Active'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-slate-100 text-slate-600'
                         }`}>
                           {role.status}
                         </span>
@@ -759,7 +780,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Sender Configuration */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="md:col-span-2 flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Aktifkan Email Otomatis:</span>
+                <span className="text-xs font-bold text-slate-700">Aktifkan Email Otomatis:</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -808,7 +829,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Email Template Tabs */}
             <div className="pt-4 border-t border-slate-100">
               <label className="text-[11px] font-bold text-slate-600 block mb-2">Template Email Tahapan:</label>
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex gap-2 mb-3 flex-wrap">
                 {(['interview', 'assessment', 'offering', 'medical', 'onboarding', 'rejected'] as const).map((stage) => (
                   <button
                     key={stage}
@@ -895,7 +916,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Aktifkan WhatsApp Konfirmasi:</span>
+                <span className="text-xs font-bold text-slate-700">Aktifkan WhatsApp Konfirmasi:</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -953,7 +974,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 type="button"
                 onClick={() => {
                   setNewDeptName('');
-                  setNewDeptBudget(10000000);
+                  setNewDeptBudget(1000000);
                   setIsBudgetModalOpen(false);
                 }}
                 className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"
@@ -980,12 +1001,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">Rp</span>
                   <input
-                    type="number"
+                    type="text"
                     required
-                    min="0"
-                    value={newDeptBudget}
-                    onChange={(e) => setNewDeptBudget(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    value={newDeptBudget.toString()}
+                    onChange={(e) => {
+                      const val = sanitizeNumberInput(e.target.value, 1000000, 9999999999);
+                      setNewDeptBudget(val);
+                    }}
+                    className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none"
+                    placeholder="1000000"
                   />
                 </div>
               </div>
@@ -995,7 +1019,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   type="button"
                   onClick={() => {
                     setNewDeptName('');
-                    setNewDeptBudget(10000000);
+                    setNewDeptBudget(1000000);
                     setIsBudgetModalOpen(false);
                   }}
                   className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
