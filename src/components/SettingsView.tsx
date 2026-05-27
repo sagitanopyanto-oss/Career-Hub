@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Settings, Sparkles, CalendarDays, Clock, DollarSign, Save, CheckCircle2,
   Users, Plus, Edit3, Trash2, ShieldCheck, X, Target, MessageCircle,
-  Eye, EyeOff, Lock, ChevronDown
+  Eye, EyeOff, Lock
 } from 'lucide-react';
 import { AppSettings, SlaSetting, AdminRole, BudgetSetting } from '../data/mockData';
 
@@ -111,7 +111,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const openAddBudgetModal = () => {
     setEditingBudgetKey(null);
     setNewDeptName('');
-    setNewDeptYear(new Date().getFullYear());
+    setNewDeptYear(new Date().getFullYear()); // Default tahun sekarang
     setNewDeptBudget(0);
     setIsBudgetModalOpen(true);
   };
@@ -139,7 +139,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     );
 
     if (isDuplicate) {
-      alert(`Budget untuk departemen "${trimmedName}" pada tahun ${newDeptYear} sudah ada!`);
+      alert(`Budget untuk departemen "${trimmedName}" pada tahun ${newDeptYear} sudah ada! Silakan edit data yang sudah ada.`);
       return;
     }
 
@@ -584,8 +584,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   value={newDeptYear}
                   onChange={(e) => setNewDeptYear(Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="2026"
+                  placeholder="2027"
                 />
+                <p className="text-[9px] text-slate-400 mt-1">Anda dapat memasukkan tahun masa depan seperti 2027, 2028, dst.</p>
               </div>
 
               <div>
