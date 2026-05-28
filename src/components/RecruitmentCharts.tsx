@@ -18,8 +18,6 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 }) => {
 
   // --- HELPER: Get Unique Departments from Settings Budget based on Filter Year ---
-  // Kita hanya mengambil departemen yang memiliki alokasi budget pada tahun yang dipilih
-  // Ini mencegah duplikasi jika departemen yang sama punya budget di tahun berbeda
   const getDepartmentsForChart = () => {
     if (!settings.budgetCostHiring) return [];
     
@@ -39,9 +37,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 
   // --- CHART 1: Lowongan vs Hired per Departemen ---
   const jobVsHiredData = departments.map(dept => {
-    // Count Active Jobs for this dept in current filter context
-    // Note: Jobs usually don't have 'year', but we assume active jobs are current.
-    // If jobs have createdAt, you might want to filter by year too.
+    // Count Active Jobs for this dept
     const openJobs = jobs.filter(j => 
       j.department === dept && 
       j.status === 'Aktif'
@@ -49,8 +45,8 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 
     // Count Hired Candidates for this dept in current filter context
     const hiredCands = candidates.filter(c => 
-      c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
-      dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()) // Simple matching logic
+      (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
+       dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
       && c.tahapProses === 'hired'
       && (filterYear === 0 ? true : new Date(c.tanggalHired!).getFullYear() === filterYear)
     ).length;
@@ -70,11 +66,9 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       (filterYear === 0 ? true : b.year === filterYear)
     );
     
-    // If multiple entries exist for same dept/year (data inconsistency), take the first or sum them.
-    // Here we assume unique constraint is handled in Settings, so findFirst is safe.
     const budget = budgetEntry ? budgetEntry.budget : 0;
 
-    // Calculate Actual Spending (Sum of Expected Salary for Hired Candidates in this Dept & Year)
+    // Calculate Actual Spending
     const actual = candidates
       .filter(c => 
         (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
@@ -178,32 +172,23 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
               
               {/* Progress Bar Container */}
               <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden relative">
-                {/* Background Bar (Budget) */}
+                
+                {/* Background Bar (Budget Capacity Visual) */}
                 <div 
                   className="absolute top-0 left-0 h-full bg-slate-300 rounded-full"
-                  style={{ width: '100%' }} // Represents 100% of the budget capacity visually if we scale by maxCostVal, but here simple relative is better
+                  style={{ width: '100%' }}
                 ></div>
                 
-                {/* Actual Bar */}
+                {/* Budget Bar Length (Relative to Global Max) */}
                 <div 
-                  className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${item.status === 'OVER' ? 'bg-rose-500' : 'bg-orange-500'}`}
-                  style={{ 
-                    width: `${Math.min((item.actual / (item.budget || 1)) * 100, 100)}%` 
-                    // Note: If you want to compare against Global Max, use (item.actual / maxCostVal) * 100
-                    // But for "Budget vs Actual" per row, comparing actual % of budget is often clearer.
-                    // Let's stick to visual comparison relative to the row's own budget for clarity, 
-                    // OR relative to global max if you want all bars aligned. 
-                    // Based on screenshot, it looks like relative to global max or fixed scale.
-                    // Let's use Global Max Scale for consistency with Chart 1:
-                    width: `${(item.budget / maxCostVal) * 100}%` // This draws the budget bar length
-                  }}
+                  className="absolute top-0 left-0 h-full bg-slate-400 rounded-full opacity-50"
+                  style={{ width: `${(item.budget / maxCostVal) * 100}%` }}
                 ></div>
-                 {/* Actual Bar Overlay */}
-                 <div 
-                  className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 opacity-80 ${item.status === 'OVER' ? 'bg-rose-600' : 'bg-orange-600'}`}
-                  style={{ 
-                    width: `${(item.actual / maxCostVal) * 100}%` 
-                  }}
+
+                {/* Actual Bar Overlay */}
+                <div 
+                  className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${item.status === 'OVER' ? 'bg-rose-600' : 'bg-orange-500'}`}
+                  style={{ width: `${(item.actual / maxCostVal) * 100}%` }}
                 ></div>
               </div>
             </div>
