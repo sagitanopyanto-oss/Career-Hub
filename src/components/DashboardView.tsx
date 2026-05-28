@@ -23,13 +23,11 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   candidates, jobs, settings,
   filterRange, setFilterRange,
-  filterYear, setFilterYear, // Gunakan filterYear global dari header
+  filterYear, setFilterYear,
   filterQuarters, setFilterQuarters,
   setActiveMenu
 }) => {
   const nowDate = new Date();
-
-  // State untuk Popup Detail Cost Hiring
   const [selectedDetailYear, setSelectedDetailYear] = useState<number | null>(null);
 
   // Derive available years from all candidate and job dates + budget settings
@@ -67,7 +65,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (isNaN(date.getTime())) return false;
     if (filterQuarters.length > 0) return isWithinYearAndQuarter(dateStr);
     if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
-
     if (filterRange === 'month') {
       return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
     } else if (filterRange === '6months') {
@@ -111,7 +108,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   let totalCompliant = 0;
   let totalViolation = 0;
-
   const slaTableData = stages.map(stg => {
     const targetSetting = settings.targetSlaDays.find(t => t.stage === stg.key);
     const targetDays = targetSetting ? targetSetting.targetDays : 3;
@@ -222,8 +218,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return costHiringData.filter(item => item.year === filterYear);
   }, [costHiringData, filterYear]);
 
-  const maxCostVal = Math.max(...filteredCostData.map(d => Math.max(d.budget, d.actual)), 1);
+  // ✅ PERBAIKAN KRITIS: Gunakan Math.max(1, ...) dan pastikan height minimal 2px
+  const maxCostVal = Math.max(
+    ...filteredCostData.map(d => Math.max(d.budget, d.actual)),
+    1 // fallback safety
+  );
+
   const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+
+  // Debug: Log jika maxCostVal = 0 (untuk debugging di dev)
+  // console.log("DEBUG: maxCostVal =", maxCostVal, "filteredCostData =", filteredCostData);
 
   return (
     <div className="space-y-6">
@@ -240,9 +244,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 key={range}
                 onClick={() => { setFilterRange(range); setFilterQuarters([]); }}
-                className={`px-2 sm:px-3 py-1.5 rounded text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap ${
-                  filterRange === range && filterQuarters.length === 0 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-2 sm:px-3 py-1.5 rounded text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap ${filterRange === range && filterQuarters.length === 0 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
               >
                 {range === 'month' ? 'Bulan Ini' : range === '6months' ? '6 Bulan' : 'Tahunan'}
               </button>
@@ -259,7 +261,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
             >
               <option value={0}>Semua Tahun</option>
-              {allYears.map(y => (<option key={y} value={y}>{y}</option>))}
+              {allYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
           </div>
 
@@ -291,12 +295,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     {isActive ? '✓' : ''}
                   </span>
                   {label}
-                  <span className={`hidden sm:inline text-[9px] font-medium ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>{desc}</span>
+                  <span className={`hidden sm:inline text-[9px] font-medium ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    {desc}
+                  </span>
                 </button>
               );
             })}
             {filterQuarters.length > 0 && (
-              <button onClick={() => setFilterQuarters([])} className="text-[10px] text-slate-500 hover:text-rose-400 font-bold transition-colors underline underline-offset-2">Reset Q</button>
+              <button
+                onClick={() => setFilterQuarters([])}
+                className="text-[10px] text-slate-500 hover:text-rose-400 font-bold transition-colors underline underline-offset-2"
+              >
+                Reset Q
+              </button>
             )}
           </div>
 
@@ -306,7 +317,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <CheckCircle className="w-3 h-3" />
                 {filterYear !== 0 ? `${filterYear}` : ''}{filterQuarters.length > 0 ? ` · ${filterQuarters.map(q => `Q${q}`).join(', ')}` : ''}
               </span>
-              <button onClick={() => { setFilterYear(nowDate.getFullYear()); setFilterQuarters([]); }} className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2">Reset</button>
+              <button
+                onClick={() => { setFilterYear(nowDate.getFullYear()); setFilterQuarters([]); }}
+                className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2"
+              >
+                Reset
+              </button>
             </div>
           )}
         </div>
@@ -340,13 +356,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 3 SLA Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
-          <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 text-emerald-600 shrink-0"><Activity className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
+            <Activity className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
           <div className="min-w-0">
             <span className="text-xs font-semibold text-slate-400 block">SLA Compliant Rate</span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-extrabold text-slate-800">{slaCompliantRate}%</span>
               <span className={`text-xs font-bold flex items-center gap-0.5 ${slaTrend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                <TrendingUp className={`w-3.5 h-3.5 ${slaTrend < 0 ? 'rotate-180' : ''}`} /> {slaTrend >= 0 ? '+' : ''}{slaTrend.toFixed(1)}%
+                <TrendingUp className={`w-3.5 h-3.5 ${slaTrend < 0 ? 'rotate-180' : ''}`} />
+                {slaTrend >= 0 ? '+' : ''}{slaTrend.toFixed(1)}%
               </span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">Total tahapan proses yang memenuhi target waktu.</p>
@@ -354,7 +373,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
-          <div className="p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 shrink-0"><Clock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+            <Clock className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
           <div className="min-w-0">
             <span className="text-xs font-semibold text-slate-400 block">Rata-rata Waktu Hired (SLA)</span>
             <div className="flex items-baseline gap-2 mt-1">
@@ -368,12 +389,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4 sm:col-span-2 lg:col-span-1">
-          <div className="p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 shrink-0"><CalendarClock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 shrink-0">
+            <CalendarClock className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
           <div className="min-w-0">
             <span className="text-xs font-semibold text-slate-400 block">Target SLA Terpenuhi</span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-3xl font-extrabold text-slate-800">{targetSlaPercent}%</span>
-              <span className={`text-xs font-bold ${targetSlaPercent >= slaGoalPercent ? 'text-emerald-600' : 'text-amber-600'}`}>Goal: {slaGoalPercent}%</span>
+              <span className={`text-xs font-bold ${targetSlaPercent >= slaGoalPercent ? 'text-emerald-600' : 'text-amber-600'}`}>
+                Goal: {slaGoalPercent}%
+              </span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">Target kumulatif kepatuhan SLA yang ditetapkan Management.</p>
           </div>
@@ -398,11 +423,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring: Budget vs Actual
             </h3>
             <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5">
-              Perbandingan alokasi budget tahunan dengan realisasi pengeluaran gaji kandidat hired 
+              Perbandingan alokasi budget tahunan dengan realisasi pengeluaran gaji kandidat hired
               {filterYear !== 0 && <span className="font-bold text-indigo-600"> (Tahun {filterYear})</span>}
             </p>
           </div>
-          
+
           {/* Legend */}
           <div className="flex items-center gap-3 text-[10px] font-bold">
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-indigo-600"></span> Budget</span>
@@ -414,7 +439,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="space-y-8">
             {/* CHART AREA */}
             <div className="relative h-72 w-full border-b border-l border-slate-200 pl-10 pb-2">
-              
               {/* Y-Axis Labels & Grid Lines */}
               <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
                 {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
@@ -429,62 +453,70 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 })}
               </div>
 
-              {/* Bars Container */}
+              {/* Bars Container - PERBAIKAN KRITIS: gunakan min-height dan flex-shrink: 0 */}
               <div className="absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2">
                 {filteredCostData.map((item) => {
-                  // Calculate heights based on maxCostVal to ensure scaling is correct
-                  // Use a small buffer if max is 0 to avoid divide by zero visual issues
+                  // Ensure height is at least 2px (not 0%)
                   const scaleBase = maxCostVal === 0 ? 1 : maxCostVal;
-                  const budgetHeight = Math.max((item.budget / scaleBase) * 100, item.budget > 0 ? 2 : 0); // Min 2% height if exists
-                  const actualHeight = Math.max((item.actual / scaleBase) * 100, item.actual > 0 ? 2 : 0);
-                  
+                  const budgetHeight = Math.max((item.budget / scaleBase) * 100, 2); // ⬅️ MIN 2%
+                  const actualHeight = Math.max((item.actual / scaleBase) * 100, 2); // ⬅️ MIN 2%
+
                   const isOver = item.actual > item.budget && item.budget > 0;
 
                   return (
                     <div key={item.year} className="flex flex-col items-center gap-2 group relative flex-1 max-w-[100px]">
-                      
                       {/* Tooltip on Hover */}
                       <div className="absolute -top-32 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[180px]">
                         <div className="font-bold mb-2 text-xs border-b border-slate-600 pb-1">{item.year}</div>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                           <span className="text-slate-300">Budget:</span> <span className="text-right font-semibold">{formatIDR(item.budget)}</span>
                           <span className="text-slate-300">Actual:</span> <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>{formatIDR(item.actual)}</span>
-                          <span className="text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1">Variance:</span> 
+                          <span className="text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1">Variance:</span>
                           <span className={`col-span-2 text-right font-bold ${isOver ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {item.budget > 0 ? `${((item.actual - item.budget) / item.budget * 100).toFixed(1)}%` : '-'}
                           </span>
                         </div>
                       </div>
 
-                      {/* The Bars */}
+                      {/* The Bars - PERBAIKAN: tambahkan min-height dan flex-shrink: 0 */}
                       <div className="flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1">
                         {/* Budget Bar */}
                         <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/bar">
                           <div
                             className="w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative"
-                            style={{ height: `${budgetHeight}%` }}
+                            style={{
+                              height: `${budgetHeight}%`,
+                              minHeight: '2px', // ⬅️ PENTING: pastikan tidak 0
+                              flexShrink: 0
+                            }}
                           >
-                             {/* Value Label on Top of Bar */}
-                             {item.budget > 0 && (
-                               <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap">
-                                 {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
-                               </span>
-                             )}
+                            {item.budget > 0 && (
+                              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap">
+                                {item.budget >= 1000000 ? `${(item.budget / 1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
+                              </span>
+                            )}
                           </div>
                         </div>
 
                         {/* Actual Bar */}
                         <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/act">
                           <div
-                            className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
-                            style={{ height: `${actualHeight}%` }}
+                            className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${
+                              isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'
+                            }`}
+                            style={{
+                              height: `${actualHeight}%`,
+                              minHeight: '2px', // ⬅️ PENTING
+                              flexShrink: 0
+                            }}
                           >
-                             {/* Value Label on Top of Bar */}
-                             {item.actual > 0 && (
-                               <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                 {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
-                               </span>
-                             )}
+                            {item.actual > 0 && (
+                              <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${
+                                isOver ? 'text-rose-600' : 'text-emerald-600'
+                              }`}>
+                                {item.actual >= 1000000 ? `${(item.actual / 1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -522,16 +554,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         const variance = detailItem.budget > 0 ? ((detailItem.actual - detailItem.budget) / detailItem.budget * 100).toFixed(1) : null;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setSelectedDetailYear(null)}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-start mb-4">
-                <h4 className="font-bold text-lg text-slate-800">Detail Cost Hiring - {detailItem.year}</h4>
-                <button onClick={() => setSelectedDetailYear(null)} className="text-slate-400 hover:text-slate-600">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4" onClick={() => setSelectedDetailYear(null)}>
+            <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5 sm:p-6">
+                <div>
+                  <h4 className="text-lg font-extrabold text-slate-800">Detail Cost Hiring - {detailItem.year}</h4>
+                  <p className="text-xs text-slate-400">Perbandingan alokasi budget dan realisasi pengeluaran gaji kandidat hired.</p>
+                </div>
+                <button onClick={() => setSelectedDetailYear(null)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
-              <div className="space-y-3">
+              <div className="p-5 sm:p-6 space-y-3">
                 <div className="flex justify-between">
                   <span className="text-sm text-slate-500">Budget:</span>
                   <span className="text-sm font-bold text-slate-700">{formatIDR(detailItem.budget)}</span>
@@ -552,17 +586,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-bold">No Data</span>
                   ) : isOver ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full text-[9px] font-bold border border-rose-100">
-                      <AlertTriangle className="w-3 h-3" /> Over Budget
+                      <AlertTriangle className="w-3.5 h-3.5" /> Over Budget
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[9px] font-bold border border-emerald-100">
-                      <CheckCircle className="w-3 h-3" /> On Budget
+                      <CheckCircle className="w-3.5 h-3.5" /> On Budget
                     </span>
                   )}
                 </div>
               </div>
-
-              <div className="mt-6 flex justify-end">
+              <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end">
                 <button
                   onClick={() => setSelectedDetailYear(null)}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold"
@@ -574,7 +607,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         );
       })()}
-
       {/* SLA Detail Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -587,7 +619,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <p className="text-slate-400 text-[11px] sm:text-xs">Evaluasi waktu proses kandidat pada masing-masing tahapan (berdasarkan filter aktif)</p>
           </div>
-          <span className="self-start sm:self-auto px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] sm:text-xs font-bold rounded-full whitespace-nowrap">Realtime SLA Tracker</span>
+          <span className="self-start sm:self-auto px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] sm:text-xs font-bold rounded-full whitespace-nowrap">
+            Realtime SLA Tracker
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[820px]">
@@ -597,7 +631,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="p-4">TARGET SLA</th>
                 <th className="p-4">TOTAL KANDIDAT</th>
                 <th className="p-4">COMPLIANT (≤ SLA)</th>
-                <th className="p-4">VIOLATION (&gt; SLA)</th>
+                <th className="p-4">VIOLATION (> SLA)</th>
                 <th className="p-4">COMPLIANT RATE</th>
                 <th className="p-4">STATUS</th>
               </tr>
@@ -606,11 +640,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {slaTableData.map((row, index) => {
                 const getStatusBadge = (status: string) => {
                   switch (status) {
-                    case 'OPTIMAL': return <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-extrabold rounded-md text-[10px]">OPTIMAL</span>;
-                    case 'WARNING': return <span className="px-2.5 py-1 bg-amber-50 text-amber-700 font-extrabold rounded-md text-[10px]">WARNING</span>;
-                    default: return <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-extrabold rounded-md text-[10px]">CRITICAL</span>;
+                    case 'OPTIMAL':
+                      return <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-extrabold rounded-md text-[10px]">OPTIMAL</span>;
+                    case 'WARNING':
+                      return <span className="px-2.5 py-1 bg-amber-50 text-amber-700 font-extrabold rounded-md text-[10px]">WARNING</span>;
+                    default:
+                      return <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-extrabold rounded-md text-[10px]">CRITICAL</span>;
                   }
                 };
+
                 return (
                   <tr key={index} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4 font-bold text-slate-800">{row.stage}</td>
@@ -622,7 +660,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="font-bold w-9">{row.rate}%</span>
                         <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0">
-                          <div className={`h-full rounded-full ${row.status === 'OPTIMAL' ? 'bg-emerald-500' : row.status === 'WARNING' ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${row.rate}%` }} />
+                          <div
+                            className={`h-full rounded-full ${
+                              row.status === 'OPTIMAL' ? 'bg-emerald-500' : row.status === 'WARNING' ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${row.rate}%` }}
+                          />
                         </div>
                       </div>
                     </td>
@@ -647,7 +690,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <p className="text-slate-400 text-[11px] sm:text-xs">Kandidat yang baru saja mensubmit aplikasi lamaran (berdasarkan filter aktif)</p>
           </div>
-          <button onClick={() => setActiveMenu('candidates')} className="self-start sm:self-auto text-[11px] sm:text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 whitespace-nowrap">
+          <button
+            onClick={() => setActiveMenu('candidates')}
+            className="self-start sm:self-auto text-[11px] sm:text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 whitespace-nowrap"
+          >
             Lihat Database Kandidat <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
@@ -667,21 +713,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {recentApplicants.map((cand) => {
                 const getStatusBadge = (tahap: string) => {
                   const colors: Record<string, string> = {
-                    applied: 'bg-blue-100 text-blue-800', screening: 'bg-indigo-100 text-indigo-800',
-                    interview: 'bg-purple-100 text-purple-800', assessment: 'bg-pink-100 text-pink-800',
-                    medical: 'bg-amber-100 text-amber-800', offering: 'bg-teal-100 text-teal-800',
-                    hired: 'bg-emerald-100 text-emerald-800', rejected: 'bg-rose-100 text-rose-800'
+                    applied: 'bg-blue-100 text-blue-800',
+                    screening: 'bg-indigo-100 text-indigo-800',
+                    interview: 'bg-purple-100 text-purple-800',
+                    assessment: 'bg-pink-100 text-pink-800',
+                    medical: 'bg-amber-100 text-amber-800',
+                    offering: 'bg-teal-100 text-teal-800',
+                    hired: 'bg-emerald-100 text-emerald-800',
+                    rejected: 'bg-rose-100 text-rose-800'
                   };
-                  return (<span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${colors[tahap] || 'bg-slate-100 text-slate-800'}`}>{tahap === 'medical' ? 'Medical Check' : tahap}</span>);
+                  return (
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${colors[tahap] || 'bg-slate-100 text-slate-800'}`}>
+                      {tahap === 'medical' ? 'Medical Check' : tahap}
+                    </span>
+                  );
                 };
+
                 const getMatchBadge = (rating: number) => {
                   if (rating >= 85) return <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{rating}% Fit</span>;
                   if (rating >= 70) return <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{rating}% Match</span>;
                   return <span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">{rating}% Low</span>;
                 };
+
                 return (
                   <tr key={cand.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4"><div className="flex flex-col"><span className="font-bold text-slate-800">{cand.nama}</span><span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span></div></td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800">{cand.nama}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span>
+                      </div>
+                    </td>
                     <td className="p-4 font-medium text-slate-700">{cand.posisiDilamar}</td>
                     <td className="p-4 text-slate-500">{cand.pendidikan} - {cand.jurusan}</td>
                     <td className="p-4">{getMatchBadge(cand.ratingKecocokan)}</td>
