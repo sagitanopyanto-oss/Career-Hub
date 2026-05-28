@@ -21,10 +21,15 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  candidates, jobs, settings,
-  filterRange, setFilterRange,
-  filterYear, setFilterYear,
-  filterQuarters, setFilterQuarters,
+  candidates,
+  jobs,
+  settings,
+  filterRange,
+  setFilterRange,
+  filterYear,
+  setFilterYear,
+  filterQuarters,
+  setFilterQuarters,
   setActiveMenu
 }) => {
   const nowDate = new Date();
@@ -64,7 +69,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (!dateStr) return false;
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return false;
-    
     if (filterQuarters.length > 0) return isWithinYearAndQuarter(dateStr);
     if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
 
@@ -75,7 +79,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       sixMonthsAgo.setMonth(nowDate.getMonth() - 6);
       return date >= sixMonthsAgo;
     }
-    return true;
+    return true; // annual or all years
   };
 
   const toggleQuarter = (q: number) => {
@@ -106,7 +110,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   let totalCompliant = 0;
   let totalViolation = 0;
-  
   const slaTableData = stages.map(stg => {
     const targetSetting = safeSettings.targetSlaDays.find(t => t.stage === stg.key);
     const targetDays = targetSetting ? targetSetting.targetDays : 3;
@@ -115,7 +118,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     displayCandidates.forEach(c => {
       const startVal = (c as any)[stg.startKey];
       const endVal = (c as any)[stg.endKey];
-      
+
       if (startVal && !isNaN(new Date(startVal).getTime())) {
         candidateCount++;
         if (endVal && !isNaN(new Date(endVal).getTime())) {
@@ -131,7 +134,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const rate = candidateCount > 0 ? Math.round((compliantCount / candidateCount) * 100) : 0;
     totalCompliant += compliantCount;
     totalViolation += violationCount;
-    
+
     let status: 'OPTIMAL' | 'WARNING' | 'CRITICAL' = 'OPTIMAL';
     if (rate < 50) status = 'CRITICAL';
     else if (rate < 80) status = 'WARNING';
@@ -141,7 +144,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const totalSlaProcessed = totalCompliant + totalViolation;
   const slaCompliantRate = totalSlaProcessed > 0 ? Math.round((totalCompliant / totalSlaProcessed) * 100) : 0;
-  
+
   const hiredCandidatesList = displayCandidates.filter(c => c.tahapProses === 'hired' && c.tanggalHired && c.tanggalApplied);
   let averageDaysToHire = 0;
   if (hiredCandidatesList.length > 0) {
@@ -156,6 +159,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const recentApplicants = [...displayCandidates]
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
     .slice(0, 5);
+
+  // --- NEW: AGGREGATE COST HIRING CHART DATA ---
+  const totalBudget = safeBudgets
+    .filter(b => filterYear === 0 ? true : b.year === filterYear)
+    .reduce((sum, b) => sum + b.budget, 0);
+
+  const totalActual = displayCandidates
+    .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
+    .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
+
+  const formatIDR = (val: number) => {
+    if (val >= 1000000000) return `Rp ${(val / 1000000000).toFixed(1)} M`;
+    if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1)} Jt`;
+    return `Rp ${val.toLocaleString('id-ID')}`;
+  };
+
+  // --- NEW: PIPELINE TAHAP REKRUTMEN DATA ---
+  const pipelineData = [
+    { label: 'Applied', count: displayCandidates.filter(c => c.tahapProses === 'applied').length, color: 'bg-blue-500' },
+    { label: 'Screening', count: displayCandidates.filter(c => c.tahapProses === 'screening').length, color: 'bg-indigo-500' },
+    { label: 'Interview', count: displayCandidates.filter(c => c.tahapProses === 'interview').length, color: 'bg-purple-500' },
+    { label: 'Assessment', count: displayCandidates.filter(c => c.tahapProses === 'assessment').length, color: 'bg-pink-500' },
+    { label: 'Medical', count: displayCandidates.filter(c => c.tahapProses === 'medical').length, color: 'bg-amber-500' },
+    { label: 'Offering', count: displayCandidates.filter(c => c.tahapProses === 'offering').length, color: 'bg-teal-500' },
+    { label: 'Hired', count: displayCandidates.filter(c => c.tahapProses === 'hired').length, color: 'bg-emerald-500' },
+    { label: 'Rejected', count: displayCandidates.filter(c => c.tahapProses === 'rejected').length, color: 'bg-rose-500' },
+  ];
+  const maxPipelineVal = Math.max(...pipelineData.map(p => p.count), 1);
 
   return (
     <div className="space-y-6">
@@ -297,7 +328,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Recruitment Visualizations Component */}
+      {/* 🔹 NEW: AGGREGATE COST HIRING CHART */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring: Total Budget vs Actual
+            </h3>
+            <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5">
+              Ringkasan total alokasi budget seluruh departemen vs realisasi pengeluaran
+              {filterYear !== 0 && <span className="font-bold text-indigo-600"> (Tahun {filterYear})</span>}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-bold">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600"></span> Budget</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Actual</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+          <div className="p-4 bg-slate-50 rounded-lg">
+            <span className="text-xs text-slate-500 font-bold uppercase">Total Budget</span>
+            <div className="text-xl font-extrabold text-slate-800 mt-1">{formatIDR(totalBudget)}</div>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-lg">
+            <span className="text-xs text-slate-500 font-bold uppercase">Total Actual</span>
+            <div className="text-xl font-extrabold text-slate-800 mt-1">{formatIDR(totalActual)}</div>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-lg">
+            <span className="text-xs text-slate-500 font-bold uppercase">Variance</span>
+            <div className="text-xl font-extrabold mt-1">
+              {totalActual > totalBudget ? (
+                <span className="text-rose-600">Over Budget</span>
+              ) : (
+                <span className="text-emerald-600">On Budget</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recruitment Visualizations */}
       <RecruitmentCharts 
         candidates={displayCandidates}
         jobs={filteredJobs}
@@ -306,6 +377,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         filterYear={filterYear}
         filterQuarters={filterQuarters}
       />
+
+      {/* 🔹 NEW: PIPELINE TAHAP REKRUTMEN CHART */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm sm:text-base">Pipeline Tahap Rekrutmen</h3>
+            <p className="text-slate-400 text-[11px] sm:text-xs">Volume kandidat aktif di setiap fase rekrutmen</p>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
+            ✓ {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {pipelineData.map((item, idx) => (
+            <div key={idx} className="space-y-1">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-slate-700">{item.label}</span>
+                <span className="text-slate-500">{item.count} Kandidat</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                <div 
+                  className={`h-2.5 rounded-full ${item.color}`}
+                  style={{ width: `${(item.count / maxPipelineVal) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* SLA Detail Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
@@ -399,10 +500,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {recentApplicants.map((cand) => {
                 const getStatusBadge = (tahap: string) => {
                   const colors: Record<string, string> = {
-                    applied: 'bg-blue-100 text-blue-800', screening: 'bg-indigo-100 text-indigo-800',
-                    interview: 'bg-purple-100 text-purple-800', assessment: 'bg-pink-100 text-pink-800',
-                    medical: 'bg-amber-100 text-amber-800', offering: 'bg-teal-100 text-teal-800',
-                    hired: 'bg-emerald-100 text-emerald-800', rejected: 'bg-rose-100 text-rose-800'
+                    applied: 'bg-blue-100 text-blue-800',
+                    screening: 'bg-indigo-100 text-indigo-800',
+                    interview: 'bg-purple-100 text-purple-800',
+                    assessment: 'bg-pink-100 text-pink-800',
+                    medical: 'bg-amber-100 text-amber-800',
+                    offering: 'bg-teal-100 text-teal-800',
+                    hired: 'bg-emerald-100 text-emerald-800',
+                    rejected: 'bg-rose-100 text-rose-800'
                   };
                   return (<span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${colors[tahap] || 'bg-slate-100 text-slate-800'}`}>{tahap === 'medical' ? 'Medical Check' : tahap}</span>);
                 };
@@ -413,7 +518,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 };
                 return (
                   <tr key={cand.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4"><div className="flex flex-col"><span className="font-bold text-slate-800">{cand.nama}</span><span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span></div></td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800">{cand.nama}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span>
+                      </div>
+                    </td>
                     <td className="p-4 font-medium text-slate-700">{cand.posisiDilamar}</td>
                     <td className="p-4 text-slate-500">{cand.pendidikan} - {cand.jurusan}</td>
                     <td className="p-4">{getMatchBadge(cand.ratingKecocokan)}</td>
