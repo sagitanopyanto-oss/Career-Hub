@@ -390,7 +390,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         filterQuarters={filterQuarters}
       />
 
-      {/* 🔹 COST HIRING CLUSTER BAR CHART SECTION - REVISED */}
+      {/* 🔹 COST HIRING CLUSTER BAR CHART SECTION - REVISED VISUAL */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
           <div>
@@ -412,81 +412,98 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {filteredCostData.length > 0 ? (
           <div className="space-y-8">
-            {/* CLUSTER BAR CHART VISUALIZATION */}
-            <div className="relative h-64 flex items-end gap-4 sm:gap-8 border-b border-l border-slate-200 pl-2 pb-2">
-              {/* Y-Axis Grid Lines */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                {[1, 0.75, 0.5, 0.25, 0].map((ratio) => (
-                  <div key={ratio} className="border-t border-dashed border-slate-100 w-full h-0 relative">
-                    <span className="absolute -left-16 -top-2.5 text-[9px] text-slate-400 font-medium w-14 text-right">
-                      {ratio > 0 ? `${(maxCostVal * ratio / 1000000).toFixed(0)}jt` : '0'}
-                    </span>
-                  </div>
-                ))}
+            {/* CHART AREA */}
+            <div className="relative h-72 w-full border-b border-l border-slate-200 pl-10 pb-2">
+              
+              {/* Y-Axis Labels & Grid Lines */}
+              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
+                {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
+                  const val = maxCostVal * ratio;
+                  return (
+                    <div key={ratio} className="border-t border-dashed border-slate-100 w-full h-0 relative flex items-center">
+                      <span className="absolute -left-10 text-[9px] text-slate-400 font-medium w-8 text-right pr-2">
+                        {val >= 1000000 ? `${(val / 1000000).toFixed(0)}jt` : val.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Bars */}
-              {filteredCostData.map((item) => {
-                const budgetHeight = maxCostVal > 0 ? (item.budget / maxCostVal) * 100 : 0;
-                const actualHeight = maxCostVal > 0 ? (item.actual / maxCostVal) * 100 : 0;
-                const isOver = item.actual > item.budget && item.budget > 0;
+              {/* Bars Container */}
+              <div className="absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2">
+                {filteredCostData.map((item) => {
+                  // Calculate heights based on maxCostVal to ensure scaling is correct
+                  // Use a small buffer if max is 0 to avoid divide by zero visual issues
+                  const scaleBase = maxCostVal === 0 ? 1 : maxCostVal;
+                  const budgetHeight = Math.max((item.budget / scaleBase) * 100, item.budget > 0 ? 2 : 0); // Min 2% height if exists
+                  const actualHeight = Math.max((item.actual / scaleBase) * 100, item.actual > 0 ? 2 : 0);
+                  
+                  const isOver = item.actual > item.budget && item.budget > 0;
 
-                return (
-                  <div key={item.year} className="flex-1 flex flex-col items-center gap-2 group relative">
-                    {/* Tooltip on Hover */}
-                    <div className="absolute -top-24 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px]">
-                      <div className="font-bold mb-1.5 text-xs border-b border-slate-600 pb-1">{item.year}</div>
-                      <div className="flex justify-between gap-3"><span className="text-slate-300">Budget:</span> <span>{formatIDR(item.budget)}</span></div>
-                      <div className="flex justify-between gap-3"><span className="text-slate-300">Actual:</span> <span>{formatIDR(item.actual)}</span></div>
-                      <div className={`flex justify-between gap-3 mt-1 pt-1 border-t border-slate-600 font-bold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>
-                        <span>Variance:</span> 
-                        <span>{item.budget > 0 ? `${((item.actual - item.budget) / item.budget * 100).toFixed(1)}%` : '-'}</span>
+                  return (
+                    <div key={item.year} className="flex flex-col items-center gap-2 group relative flex-1 max-w-[100px]">
+                      
+                      {/* Tooltip on Hover */}
+                      <div className="absolute -top-32 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[180px]">
+                        <div className="font-bold mb-2 text-xs border-b border-slate-600 pb-1">{item.year}</div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                          <span className="text-slate-300">Budget:</span> <span className="text-right font-semibold">{formatIDR(item.budget)}</span>
+                          <span className="text-slate-300">Actual:</span> <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>{formatIDR(item.actual)}</span>
+                          <span className="text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1">Variance:</span> 
+                          <span className={`col-span-2 text-right font-bold ${isOver ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {item.budget > 0 ? `${((item.actual - item.budget) / item.budget * 100).toFixed(1)}%` : '-'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* The Bars */}
+                      <div className="flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1">
+                        {/* Budget Bar */}
+                        <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/bar">
+                          <div
+                            className="w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative"
+                            style={{ height: `${budgetHeight}%` }}
+                          >
+                             {/* Value Label on Top of Bar */}
+                             {item.budget > 0 && (
+                               <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap">
+                                 {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
+                               </span>
+                             )}
+                          </div>
+                        </div>
+
+                        {/* Actual Bar */}
+                        <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/act">
+                          <div
+                            className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
+                            style={{ height: `${actualHeight}%` }}
+                          >
+                             {/* Value Label on Top of Bar */}
+                             {item.actual > 0 && (
+                               <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                 {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
+                               </span>
+                             )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* X-Axis Label */}
+                      <div className="text-center mt-2">
+                        <span className="text-xs font-bold text-slate-600 block">{item.year}</span>
+                        <button
+                          onClick={() => setSelectedDetailYear(item.year)}
+                          className="text-[9px] text-indigo-600 hover:text-indigo-800 underline mt-1 hidden sm:block"
+                        >
+                          Detail
+                        </button>
                       </div>
                     </div>
-
-                    {/* Cluster Bars Container */}
-                    <div className="flex items-end gap-2 sm:gap-4 w-full justify-center h-full px-2">
-                      {/* Budget Bar - Clickable for Detail */}
-                      <div 
-                        className="relative flex flex-col items-center justify-end h-full w-1/2 cursor-pointer hover:opacity-90"
-                        onClick={() => setSelectedDetailYear(item.year)}
-                        title="Klik untuk lihat detail"
-                      >
-                        <div
-                          className="w-full max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500"
-                          style={{ height: `${Math.max(budgetHeight, 0.5)}%` }}
-                        ></div>
-                      </div>
-                      {/* Actual Bar - Clickable for Detail */}
-                      <div 
-                        className="relative flex flex-col items-center justify-end h-full w-1/2 cursor-pointer hover:opacity-90"
-                        onClick={() => setSelectedDetailYear(item.year)}
-                        title="Klik untuk lihat detail"
-                      >
-                        <div
-                          className={`w-full max-w-[40px] rounded-t-md transition-all duration-500 ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
-                          style={{ height: `${Math.max(actualHeight, 0.5)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    {/* X-Axis Label with Optional Detail Button */}
-                    <div className="text-center mt-2 flex flex-col items-center gap-1">
-                      <span className="text-xs font-bold text-slate-600">{item.year}</span>
-                      {/* Optional: Small button to trigger detail if user doesn't click bar */}
-                      <button
-                        onClick={() => setSelectedDetailYear(item.year)}
-                        className="text-[9px] text-indigo-600 hover:text-indigo-800 underline hidden sm:block"
-                      >
-                        Detail
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-
-            {/* NO TABLE HERE ANYMORE - REMOVED AS REQUESTED */}
           </div>
         ) : (
           <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
@@ -496,7 +513,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
-      {/* 🔹 MODAL DETAIL COST HIRING (POP UP) */}
+      {/* 🔹 MODAL DETAIL COST HIRING (POP UP) - UNCHANGED */}
       {selectedDetailYear !== null && (() => {
         const detailItem = costHiringData.find(d => d.year === selectedDetailYear);
         if (!detailItem) return null;
