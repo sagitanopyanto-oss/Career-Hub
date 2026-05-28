@@ -5,8 +5,7 @@ import {
   DollarSign, AlertTriangle
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
-// Kita tidak mengimpor RecruitmentCharts lagi jika kita render chartnya langsung di sini
-// import { RecruitmentCharts } from './RecruitmentCharts'; 
+import { RecruitmentCharts } from './RecruitmentCharts';
 
 interface DashboardViewProps {
   candidates: Candidate[];
@@ -30,31 +29,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const nowDate = new Date();
 
-  // Derive available years
+  // Safe Data Handling
+  const safeCandidates = candidates || [];
+  const safeJobs = jobs || [];
+  const safeSettings = settings || { budgetCostHiring: [], targetSlaDays: [], targetSlaManagement: 85 };
+  const safeBudgets = safeSettings.budgetCostHiring || [];
+
+  // Derive available years safely
   const allYears = Array.from(new Set([
-    ...candidates.map(c => c.tanggalApplied ? new Date(c.tanggalApplied).getFullYear() : null),
-    ...jobs.map(j => j.createdAt ? new Date(j.createdAt).getFullYear() : null),
+    ...safeCandidates.map(c => c.tanggalApplied ? new Date(c.tanggalApplied).getFullYear() : null),
+    ...safeJobs.map(j => j.createdAt ? new Date(j.createdAt).getFullYear() : null),
     nowDate.getFullYear()
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
 
   const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
-  const diffInDays = (d1: string, d2: string) => Math.max(0, Math.floor((new Date(d1).getTime() - new Date(d2).getTime()) / (1000 * 60 * 60 * 24)));
+  const diffInDays = (d1: string, d2: string) => {
+    if (!d1 || !d2) return 0;
+    return Math.max(0, Math.floor((new Date(d1).getTime() - new Date(d2).getTime()) / (1000 * 60 * 60 * 24)));
+  };
+
+  const isWithinYearAndQuarter = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+    if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
+    if (filterQuarters.length > 0) {
+      const q = getQuarter(date);
+      if (!filterQuarters.includes(q)) return false;
+    }
+    return true;
+  };
 
   const isWithinFilterRange = (dateStr?: string) => {
     if (!dateStr) return false;
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return false;
     
-    // Year Filter
+    if (filterQuarters.length > 0) return isWithinYearAndQuarter(dateStr);
     if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
-    
-    // Quarter Filter
-    if (filterQuarters.length > 0) {
-      const q = getQuarter(date);
-      if (!filterQuarters.includes(q)) return false;
-    }
 
-    // Range Filter
     if (filterRange === 'month') {
       return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
     } else if (filterRange === '6months') {
@@ -62,15 +75,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       sixMonthsAgo.setMonth(nowDate.getMonth() - 6);
       return date >= sixMonthsAgo;
     }
-    return true; // Annual or All Years
+    return true;
   };
 
   const toggleQuarter = (q: number) => {
     setFilterQuarters(filterQuarters.includes(q) ? filterQuarters.filter(x => x !== q) : [...filterQuarters, q]);
   };
 
-  const filteredCandidates = candidates.filter(c => isWithinFilterRange(c.tanggalApplied));
-  const filteredJobs = jobs.filter(j => isWithinFilterRange(j.createdAt));
+  const filteredCandidates = safeCandidates.filter(c => isWithinFilterRange(c.tanggalApplied));
+  const filteredJobs = safeJobs.filter(j => isWithinFilterRange(j.createdAt));
   const displayCandidates = filteredCandidates;
 
   // Analytics Cards Data
@@ -93,14 +106,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   let totalCompliant = 0;
   let totalViolation = 0;
+  
   const slaTableData = stages.map(stg => {
-    const targetSetting = settings.targetSlaDays.find(t => t.stage === stg.key);
+    const targetSetting = safeSettings.targetSlaDays.find(t => t.stage === stg.key);
     const targetDays = targetSetting ? targetSetting.targetDays : 3;
     let candidateCount = 0, compliantCount = 0, violationCount = 0;
 
     displayCandidates.forEach(c => {
       const startVal = (c as any)[stg.startKey];
       const endVal = (c as any)[stg.endKey];
+      
       if (startVal && !isNaN(new Date(startVal).getTime())) {
         candidateCount++;
         if (endVal && !isNaN(new Date(endVal).getTime())) {
@@ -116,104 +131,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const rate = candidateCount > 0 ? Math.round((compliantCount / candidateCount) * 100) : 0;
     totalCompliant += compliantCount;
     totalViolation += violationCount;
+    
     let status: 'OPTIMAL' | 'WARNING' | 'CRITICAL' = 'OPTIMAL';
-    if (rate < 50) status = 'CRITICAL'; else if (rate < 80) status = 'WARNING';
+    if (rate < 50) status = 'CRITICAL';
+    else if (rate < 80) status = 'WARNING';
 
     return { stage: stg.label, targetDays, candidates: candidateCount, compliant: compliantCount, violation: violationCount, rate, status };
   });
 
-  const slaCompliantRate = (totalCompliant + totalViolation) > 0 ? Math.round((totalCompliant / (totalCompliant + totalViolation)) * 100) : 0;
+  const totalSlaProcessed = totalCompliant + totalViolation;
+  const slaCompliantRate = totalSlaProcessed > 0 ? Math.round((totalCompliant / totalSlaProcessed) * 100) : 0;
   
-  // Average Days to Hire
-  const hiredCandidates = displayCandidates.filter(c => c.tahapProses === 'hired' && c.tanggalHired && c.tanggalApplied);
+  const hiredCandidatesList = displayCandidates.filter(c => c.tahapProses === 'hired' && c.tanggalHired && c.tanggalApplied);
   let averageDaysToHire = 0;
-  if (hiredCandidates.length > 0) {
-    const totalDays = hiredCandidates.reduce((acc, c) => acc + diffInDays(c.tanggalHired!, c.tanggalApplied), 0);
-    averageDaysToHire = parseFloat((totalDays / hiredCandidates.length).toFixed(1));
+  if (hiredCandidatesList.length > 0) {
+    const totalDays = hiredCandidatesList.reduce((acc, c) => acc + diffInDays(c.tanggalHired!, c.tanggalApplied), 0);
+    averageDaysToHire = parseFloat((totalDays / hiredCandidatesList.length).toFixed(1));
   }
 
-  const averageTargetSla = settings.targetSlaDays.reduce((sum, s) => sum + s.targetDays, 0) / settings.targetSlaDays.length || 3;
-  const slaGoalPercent = settings.targetSlaManagement ?? 85;
+  const avgTargetSla = safeSettings.targetSlaDays.reduce((sum, s) => sum + s.targetDays, 0) / (safeSettings.targetSlaDays.length || 1);
+  const slaGoalPercent = safeSettings.targetSlaManagement ?? 85;
 
   // Recent Applicants
-  const recentApplicants = [...displayCandidates].sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime()).slice(0, 5);
-
-  // --- CHART DATA: PIPELINE TAHAP REKRUTMEN ---
-  const pipelineData = [
-    { label: 'Applied', count: displayCandidates.filter(c => c.tahapProses === 'applied').length, color: 'bg-blue-500' },
-    { label: 'Screening', count: displayCandidates.filter(c => c.tahapProses === 'screening').length, color: 'bg-indigo-500' },
-    { label: 'Interview', count: displayCandidates.filter(c => c.tahapProses === 'interview').length, color: 'bg-purple-500' },
-    { label: 'Assessment', count: displayCandidates.filter(c => c.tahapProses === 'assessment').length, color: 'bg-pink-500' },
-    { label: 'Medical', count: displayCandidates.filter(c => c.tahapProses === 'medical').length, color: 'bg-amber-500' },
-    { label: 'Offering', count: displayCandidates.filter(c => c.tahapProses === 'offering').length, color: 'bg-teal-500' },
-    { label: 'Hired', count: displayCandidates.filter(c => c.tahapProses === 'hired').length, color: 'bg-emerald-500' },
-    { label: 'Rejected', count: displayCandidates.filter(c => c.tahapProses === 'rejected').length, color: 'bg-rose-500' },
-  ];
-  const maxPipelineVal = Math.max(...pipelineData.map(p => p.count), 1);
-
-  // --- CHART DATA: TREN LOWONGAN VS REKRUTMEN (Per Month) ---
-  // Generate last 6 months labels based on current date
-  const trendData = useMemo(() => {
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(nowDate);
-      d.setMonth(nowDate.getMonth() - i);
-      months.push({
-        month: d.toLocaleString('id-ID', { month: 'short', year: '2-digit' }),
-        year: d.getFullYear(),
-        monthNum: d.getMonth()
-      });
-    }
-
-    return months.map(m => {
-      const jobsCreated = jobs.filter(j => {
-        const jd = new Date(j.createdAt);
-        return jd.getMonth() === m.monthNum && jd.getFullYear() === m.year;
-      }).length;
-
-      const hiresMade = candidates.filter(c => {
-        if (c.tahapProses !== 'hired' || !c.tanggalHired) return false;
-        const hd = new Date(c.tanggalHired);
-        return hd.getMonth() === m.monthNum && hd.getFullYear() === m.year;
-      }).length;
-
-      return { label: m.month, jobs: jobsCreated, hires: hiresMade };
-    });
-  }, [jobs, candidates, nowDate]);
-
-  const maxTrendVal = Math.max(...trendData.map(t => Math.max(t.jobs, t.hires)), 1);
-
-  // --- CHART DATA: COST HIRING PER DEPARTEMEN ---
-  // Get unique departments from settings budget for the selected year
-  const deptBudgets = settings.budgetCostHiring.filter(b => filterYear === 0 ? true : b.year === filterYear);
-  const uniqueDepts = Array.from(new Set(deptBudgets.map(b => b.department))).sort();
-
-  const costHiringData = uniqueDepts.map(dept => {
-    // Find budget for this dept and year
-    const budgetEntry = deptBudgets.find(b => b.department === dept);
-    const budget = budgetEntry ? budgetEntry.budget : 0;
-
-    // Calculate actual spending for this dept in the selected year
-    const actual = candidates
-      .filter(c => 
-        c.tahapProses === 'hired' && 
-        c.tanggalHired &&
-        (filterYear === 0 ? true : new Date(c.tanggalHired).getFullYear() === filterYear) &&
-        (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
-      )
-      .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
-
-    return {
-      department: dept,
-      budget: budget,
-      actual: actual,
-      remaining: budget - actual,
-      status: actual > budget ? 'OVER' : 'SAFE'
-    };
-  });
-
-  const maxCostVal = Math.max(...costHiringData.map(d => Math.max(d.budget, d.actual)), 1);
-  const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+  const recentApplicants = [...displayCandidates]
+    .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -319,158 +261,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         })}
       </div>
 
-  {/* 3 SLA Cards */}
-   <div className= "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 " >
-     {/* ... Isi SLA Cards tetap sama ... */}
-   </div >
-
-  {/* 🔹 NEW: AGGREGATE COST HIRING CHART (BUDGET VS ACTUAL TOTAL) */}
-  <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-    <div className="flex items-center justify-between mb-4">
-      <div>
-        <h3 className="font-bold text-slate-800 text-sm sm:text-base">Cost Hiring: Total Budget vs Actual</h3>
-        <p className="text-slate-400 text-[11px] sm:text-xs">Ringkasan total alokasi budget seluruh departemen vs realisasi pengeluaran</p>
-      </div>
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-[9px] font-bold border border-indigo-100">
-         ✓ {filterYear === 0 ? 'Semua Tahun' : filterYear}
-      </span>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-      {/* Total Budget Card */}
-      <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-        <span className="text-xs text-slate-500 font-bold uppercase">Total Budget</span>
-        <div className="text-xl font-extrabold text-slate-800 mt-1">
-          {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(
-            settings.budgetCostHiring
-              .filter(b => filterYear === 0 ? true : b.year === filterYear)
-              .reduce((sum, b) => sum + b.budget, 0)
-          )}
-        </div>
-      </div>
-
-      {/* Total Actual Card */}
-      <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-        <span className="text-xs text-slate-500 font-bold uppercase">Total Actual</span>
-        <div className="text-xl font-extrabold text-slate-800 mt-1">
-          {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(
-            candidates
-              .filter(c => c.tahapProses === 'hired' && c.tanggalHired && (filterYear === 0 ? true : new Date(c.tanggalHired).getFullYear() === filterYear))
-              .reduce((sum, c) => sum + (c.expectedSalary || 0), 0)
-          )}
-        </div>
-      </div>
-
-      {/* Variance Card */}
-      <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-        <span className="text-xs text-slate-500 font-bold uppercase">Variance</span>
-        <div className="text-xl font-extrabold mt-1">
-           {/* Logic sederhana untuk demo visual */}
-           <span className="text-emerald-600">On Track</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {/* Recruitment Visualizations (Lowongan vs Hired, Cost per Dept, Trend) */}
-   <RecruitmentCharts 
-    candidates={displayCandidates}
-    jobs={filteredJobs}
-    settings={settings}
-    filterRange={filterRange}
-    filterYear={filterYear}
-    filterQuarters={filterQuarters}
-  / >
-
-  {/* Pipeline Tahap Rekrutmen & Latest Applicants Grid */}
-  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-     
-     {/* Chart: Pipeline Tahap Rekrutmen (Span 2 cols) */}
-     <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold text-slate-800 text-sm sm:text-base">Pipeline Tahap Rekrutmen</h3>
-            <p className="text-slate-400 text-[11px] sm:text-xs">Volume kandidat aktif di setiap fase rekrutmen</p>
+      {/* 3 SLA Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+        <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
+          <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 text-emerald-600 shrink-0"><Activity className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-slate-400 block">SLA Compliant Rate</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-extrabold text-slate-800">{slaCompliantRate}%</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Total tahapan proses yang memenuhi target waktu.</p>
           </div>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
-             ✓ {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
-          </span>
         </div>
-        
-        <div className="space-y-3">
-          {[
-            { label: 'Applied', count: displayCandidates.filter(c => c.tahapProses === 'applied').length, color: 'bg-blue-500' },
-            { label: 'Screening', count: displayCandidates.filter(c => c.tahapProses === 'screening').length, color: 'bg-indigo-500' },
-            { label: 'Interview', count: displayCandidates.filter(c => c.tahapProses === 'interview').length, color: 'bg-purple-500' },
-            { label: 'Assessment', count: displayCandidates.filter(c => c.tahapProses === 'assessment').length, color: 'bg-pink-500' },
-            { label: 'Medical', count: displayCandidates.filter(c => c.tahapProses === 'medical').length, color: 'bg-amber-500' },
-            { label: 'Offering', count: displayCandidates.filter(c => c.tahapProses === 'offering').length, color: 'bg-teal-500' },
-            { label: 'Hired', count: displayCandidates.filter(c => c.tahapProses === 'hired').length, color: 'bg-emerald-500' },
-            { label: 'Rejected', count: displayCandidates.filter(c => c.tahapProses === 'rejected').length, color: 'bg-rose-500' },
-          ].map((item, idx) => {
-             const maxVal = Math.max(...[
-               displayCandidates.filter(c => c.tahapProses === 'applied').length,
-               displayCandidates.filter(c => c.tahapProses === 'screening').length,
-               displayCandidates.filter(c => c.tahapProses === 'interview').length,
-               displayCandidates.filter(c => c.tahapProses === 'assessment').length,
-               displayCandidates.filter(c => c.tahapProses === 'medical').length,
-               displayCandidates.filter(c => c.tahapProses === 'offering').length,
-               displayCandidates.filter(c => c.tahapProses === 'hired').length,
-               displayCandidates.filter(c => c.tahapProses === 'rejected').length
-             ], 1);
 
-             return (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700">{item.label}</span>
-                  <span className="text-slate-500">{item.count} Kandidat</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <div 
-                    className={`h-2.5 rounded-full ${item.color}`}
-                    style={{ width: `${(item.count / maxVal) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
+          <div className="p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 shrink-0"><Clock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-slate-400 block">Rata-rata Waktu Hired (SLA)</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-extrabold text-slate-800">{averageDaysToHire} Hari</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Rata-rata waktu proses apply hingga tanda tangan kontrak.</p>
+          </div>
         </div>
-     </div>
 
-     {/* Latest Applicants (Span 1 col) */}
-     <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-slate-100">
-           <h3 className="font-bold text-slate-800 text-sm">Pelamar Terbaru</h3>
+        <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4 sm:col-span-2 lg:col-span-1">
+          <div className="p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 shrink-0"><CalendarClock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-slate-400 block">Target SLA Terpenuhi</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-extrabold text-slate-800">{slaGoalPercent}%</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Target kumulatif kepatuhan SLA yang ditetapkan Management.</p>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto max-h-[300px]">
-          <table className="w-full text-left text-xs">
-            <tbody className="divide-y divide-slate-100">
-              {recentApplicants.map((cand) => (
-                 <tr key={cand.id} className="hover:bg-slate-50">
-                   <td className="p-3">
-                     <div className="font-bold text-slate-800">{cand.nama}</div>
-                     <div className="text-[10px] text-slate-500">{cand.posisiDilamar}</div>
-                   </td>
-                   <td className="p-3 text-right">
-                     <span className={`px-2 py-1 rounded-full text-[9px] font-bold ${
-                       cand.tahapProses === 'hired' ? 'bg-emerald-100 text-emerald-700' :
-                       cand.tahapProses === 'rejected' ? 'bg-rose-100 text-rose-700' :
-                       'bg-blue-100 text-blue-700'
-                     }`}>
-                       {cand.tahapProses}
-                     </span>
-                   </td>
-                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="p-3 border-t border-slate-100 text-center">
-          <button onClick={() => setActiveMenu('candidates')} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">Lihat Semua Kandidat</button>
-        </div>
-     </div>
+      </div>
 
-  </div>
+      {/* Recruitment Visualizations Component */}
+      <RecruitmentCharts 
+        candidates={displayCandidates}
+        jobs={filteredJobs}
+        settings={safeSettings}
+        filterRange={filterRange}
+        filterYear={filterYear}
+        filterQuarters={filterQuarters}
+      />
 
       {/* SLA Detail Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
