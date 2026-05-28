@@ -60,7 +60,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [editingBudgetKey, setEditingBudgetKey] = useState<string | null>(null); // Key format: "DeptName-Year"
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptYear, setNewDeptYear] = useState<number>(new Date().getFullYear());
-  const [newDeptBudget, setNewDeptBudget] = useState<number>(0);
+  const [newDeptBudget, setNewDeptBudget] = useState<number>(0); // Default 0 allowed
 
   // Role Form State
   const [roleFormName, setRoleFormName] = useState('');
@@ -76,7 +76,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   // --- HELPER FUNCTIONS ---
 
-  // Sanitize number input (remove leading zeros)
+  // Sanitize number input (remove leading zeros, allow 0)
   const sanitizeNumberInput = (value: string): string => {
     let cleaned = value.replace(/[^\d]/g, '');
     if (cleaned.startsWith('0') && cleaned.length > 1) {
@@ -111,8 +111,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const openAddBudgetModal = () => {
     setEditingBudgetKey(null);
     setNewDeptName('');
-    setNewDeptYear(new Date().getFullYear()); // Default tahun sekarang
-    setNewDeptBudget(0);
+    setNewDeptYear(new Date().getFullYear());
+    setNewDeptBudget(0); // Start with 0
     setIsBudgetModalOpen(true);
   };
 
@@ -143,11 +143,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       return;
     }
 
+    // Allow 0 as a valid budget value
+    const finalBudget = Number(newDeptBudget); 
+
     if (editingBudgetKey) {
       // UPDATE Existing
       setDeptBudgets(prev => prev.map(b => 
         (b.department === newDeptName && b.year === newDeptYear)
-          ? { ...b, budget: newDeptBudget }
+          ? { ...b, budget: finalBudget }
           : b
       ));
     } else {
@@ -155,7 +158,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       const newEntry = { 
         department: trimmedName, 
         year: newDeptYear, 
-        budget: newDeptBudget, 
+        budget: finalBudget, 
         actual: 0 
       };
       setDeptBudgets(prev => [...prev, newEntry]);
@@ -400,7 +403,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </button>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Atur batas budget tahunan untuk perekrutan per divisi. Klik tombol Edit untuk mengubah nilai budget dinamis.
+              Atur batas budget tahunan untuk perekrutan per divisi. Klik tombol Edit untuk mengubah nilai budget dinamis (termasuk nilai 0).
             </p>
 
             {/* TABLE BUDGET */}
@@ -586,7 +589,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="2027"
                 />
-                <p className="text-[9px] text-slate-400 mt-1">Anda dapat memasukkan tahun masa depan seperti 2027, 2028, dst.</p>
               </div>
 
               <div>
@@ -597,15 +599,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     type="text"
                     inputMode="numeric"
                     required
+                    // Display empty string if 0, otherwise display the number
                     value={newDeptBudget === 0 ? '' : newDeptBudget.toString()}
                     onChange={(e) => { 
                       const val = sanitizeNumberInput(e.target.value); 
+                      // If empty, set to 0. If number, set to number.
                       setNewDeptBudget(val === '' ? 0 : Number(val)); 
                     }}
                     placeholder="0"
                     className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
+                <p className="text-[9px] text-slate-400 mt-1">Isi 0 jika belum ada alokasi budget.</p>
               </div>
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 mt-2">
                 <button type="button" onClick={() => setIsBudgetModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100">Batal</button>
