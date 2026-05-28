@@ -5,7 +5,8 @@ import {
   DollarSign, AlertTriangle
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
-import { RecruitmentCharts } from './RecruitmentCharts';
+// Kita tidak mengimpor RecruitmentCharts lagi jika kita render chartnya langsung di sini
+// import { RecruitmentCharts } from './RecruitmentCharts'; 
 
 interface DashboardViewProps {
   candidates: Candidate[];
@@ -151,7 +152,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const maxPipelineVal = Math.max(...pipelineData.map(p => p.count), 1);
 
   // --- CHART DATA: TREN LOWONGAN VS REKRUTMEN (Per Month) ---
-  // Generate last 6 months labels
+  // Generate last 6 months labels based on current date
   const trendData = useMemo(() => {
     const months = [];
     for (let i = 5; i >= 0; i--) {
@@ -181,6 +182,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [jobs, candidates, nowDate]);
 
   const maxTrendVal = Math.max(...trendData.map(t => Math.max(t.jobs, t.hires)), 1);
+
+  // --- CHART DATA: COST HIRING PER DEPARTEMEN ---
+  // Get unique departments from settings budget for the selected year
+  const deptBudgets = settings.budgetCostHiring.filter(b => filterYear === 0 ? true : b.year === filterYear);
+  const uniqueDepts = Array.from(new Set(deptBudgets.map(b => b.department))).sort();
+
+  const costHiringData = uniqueDepts.map(dept => {
+    // Find budget for this dept and year
+    const budgetEntry = deptBudgets.find(b => b.department === dept);
+    const budget = budgetEntry ? budgetEntry.budget : 0;
+
+    // Calculate actual spending for this dept in the selected year
+    const actual = candidates
+      .filter(c => 
+        c.tahapProses === 'hired' && 
+        c.tanggalHired &&
+        (filterYear === 0 ? true : new Date(c.tanggalHired).getFullYear() === filterYear) &&
+        (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
+      )
+      .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
+
+    return {
+      department: dept,
+      budget: budget,
+      actual: actual,
+      remaining: budget - actual,
+      status: actual > budget ? 'OVER' : 'SAFE'
+    };
+  });
+
+  const maxCostVal = Math.max(...costHiringData.map(d => Math.max(d.budget, d.actual)), 1);
+  const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
   return (
     <div className="space-y-6">
@@ -322,20 +355,120 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Recruitment Visualizations (Lowongan vs Hired & Cost Hiring) */}
-      <RecruitmentCharts 
-        candidates={displayCandidates}
-        jobs={filteredJobs}
-        settings={settings}
-        filterRange={filterRange}
-        filterYear={filterYear}
-        filterQuarters={filterQuarters}
-      />
-
-      {/* NEW SECTION: Pipeline & Trend Charts */}
+      {/* NEW SECTION: Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Chart: Pipeline Tahap Rekrutmen */}
+        {/* Chart 1: Lowongan vs Hired per Departemen */}
+        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Lowongan vs Hired per Departemen</h3>
+              <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan posisi dibuka dan kandidat yang berhasil direkrut</p>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
+               ✓ {filterYear === 0 ? 'Semua Tahun' : filterYear}
+            </span>
+          </div>
+          
+          <div className="h-[250px] flex items-end justify-around gap-2 pt-4 pb-2 overflow-x-auto">
+            {uniqueDepts.length > 0 ? uniqueDepts.map((dept, idx) => {
+               // Calculate counts for this specific dept
+               const openJobs = jobs.filter(j => j.department === dept && j.status === 'Aktif').length;
+               const hiredCands = candidates.filter(c => 
+                 c.tahapProses === 'hired' && 
+                 (filterYear === 0 ? true : new Date(c.tanggalHired!).getFullYear() === filterYear) &&
+                 (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
+               ).length;
+               
+               const maxVal = Math.max(openJobs, hiredCands, 1); // Local max for scaling if needed, or use global
+
+               return (
+                <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[40px] group">
+                  <div className="flex items-end gap-1 h-[200px] w-full justify-center relative">
+                    {/* Bar Lowongan */}
+                    <div 
+                      className="w-3 sm:w-4 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600"
+                      style={{ height: `${(openJobs / Math.max(...uniqueDepts.map(d => jobs.filter(j => j.department === d && j.status === 'Aktif').length))) * 100}%` }}
+                      title={`Lowongan: ${openJobs}`}
+                    ></div>
+                    {/* Bar Hired */}
+                    <div 
+                      className="w-3 sm:w-4 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600"
+                      style={{ height: `${(hiredCands / Math.max(...uniqueDepts.map(d => candidates.filter(c => c.tahapProses === 'hired' && (filterYear === 0 ? true : new Date(c.tanggalHired!).getFullYear() === filterYear) && (c.posisiDilamar.toLowerCase().includes(d.toLowerCase()) || d.toLowerCase().includes(c.posisiDilamar.toLowerCase()))).length))) * 100}%` }}
+                      title={`Hired: ${hiredCands}`}
+                    ></div>
+                  </div>
+                  <div className="text-center mt-2">
+                     <span className="text-[10px] font-semibold text-slate-600 block truncate max-w-[60px]" title={dept}>
+                       {dept}
+                     </span>
+                     <span className="text-[9px] text-slate-400">{openJobs}/{hiredCands}</span>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data departemen untuk tahun ini.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Chart 2: Cost Hiring per Departemen */}
+        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Cost Hiring per Departemen</h3>
+              <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan budget alokasi vs pengeluaran riil</p>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-bold">
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300"></span> Budget</span>
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Aktual</span>
+            </div>
+          </div>
+
+          <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+            {costHiringData.length > 0 ? costHiringData.map((item, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-700 truncate max-w-[120px]" title={item.department}>{item.department}</span>
+                  <div className="flex items-center gap-2">
+                     <span className="text-slate-500">Real: <b className={item.status === 'OVER' ? 'text-rose-600' : 'text-slate-700'}>{formatIDR(item.actual)}</b></span>
+                     <span className="text-slate-400">|</span>
+                     <span className="text-slate-500">Budg: <b>{formatIDR(item.budget)}</b></span>
+                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${item.status === 'OVER' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                       {item.status}
+                     </span>
+                  </div>
+                </div>
+                
+                {/* Progress Bar Container */}
+                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden relative">
+                  
+                  {/* Background Bar (Budget Capacity Visual) */}
+                  <div 
+                    className="absolute top-0 left-0 h-full bg-slate-300 rounded-full"
+                    style={{ width: '100%' }}
+                  ></div>
+                  
+                  {/* Budget Bar Length (Relative to Global Max) */}
+                  <div 
+                    className="absolute top-0 left-0 h-full bg-slate-400 rounded-full opacity-50"
+                    style={{ width: `${(item.budget / maxCostVal) * 100}%` }}
+                  ></div>
+
+                  {/* Actual Bar Overlay */}
+                  <div 
+                    className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${item.status === 'OVER' ? 'bg-rose-600' : 'bg-orange-500'}`}
+                    style={{ width: `${(item.actual / maxCostVal) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            )) : (
+               <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data budget untuk tahun ini.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Chart 3: Pipeline Tahap Rekrutmen */}
         <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -365,7 +498,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Chart: Tren Lowongan vs Rekrutmen */}
+        {/* Chart 4: Tren Lowongan vs Rekrutmen */}
         <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
