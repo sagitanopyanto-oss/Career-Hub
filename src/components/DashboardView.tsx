@@ -631,7 +631,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="p-4">TARGET SLA</th>
                 <th className="p-4">TOTAL KANDIDAT</th>
                 <th className="p-4">COMPLIANT (≤ SLA)</th>
-                <th className="p-4">VIOLATION (> SLA)</th>
+                <th className="p-4">VIOLATION (&gt; SLA)</th>
                 <th className="p-4">COMPLIANT RATE</th>
                 <th className="p-4">STATUS</th>
               </tr>
