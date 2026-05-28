@@ -21,7 +21,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [targetSlaManagement, setTargetSlaManagement] = useState(settings.targetSlaManagement ?? 85);
   
   // Department Budgets State
-  // Ensure each item has a year (default to current year if missing for legacy data)
   const [deptBudgets, setDeptBudgets] = useState<BudgetSetting[]>(
     settings.budgetCostHiring.map(b => ({ ...b, year: b.year || new Date().getFullYear() }))
   );
@@ -60,7 +59,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [editingBudgetKey, setEditingBudgetKey] = useState<string | null>(null); // Key format: "DeptName-Year"
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptYear, setNewDeptYear] = useState<number>(new Date().getFullYear());
-  const [newDeptBudget, setNewDeptBudget] = useState<number>(0); // Default 0 allowed
+  const [newDeptBudget, setNewDeptBudget] = useState<number>(0);
 
   // Role Form State
   const [roleFormName, setRoleFormName] = useState('');
@@ -76,7 +75,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   // --- HELPER FUNCTIONS ---
 
-  // Sanitize number input (remove leading zeros, allow 0)
   const sanitizeNumberInput = (value: string): string => {
     let cleaned = value.replace(/[^\d]/g, '');
     if (cleaned.startsWith('0') && cleaned.length > 1) {
@@ -91,7 +89,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     );
   };
 
-  // Sync settings to parent
   const syncSettingsToParent = () => {
     onUpdateSettings({
       autoScreeningATS,
@@ -106,13 +103,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     });
   };
 
-  // --- BUDGET CRUD LOGIC ---
+  // --- BUDGET CRUD LOGIC (FIXED FOR YEAR EDIT & ZERO BUDGET) ---
 
   const openAddBudgetModal = () => {
     setEditingBudgetKey(null);
     setNewDeptName('');
     setNewDeptYear(new Date().getFullYear());
-    setNewDeptBudget(0); // Start with 0
+    setNewDeptBudget(0);
     setIsBudgetModalOpen(true);
   };
 
@@ -129,36 +126,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     if (!newDeptName.trim()) return;
 
     const trimmedName = newDeptName.trim();
-    const currentKey = `${trimmedName}-${newDeptYear}`;
+    const oldKey = editingBudgetKey; // e.g., "Finance-2026"
+    const newKey = `${trimmedName}-${newDeptYear}`;
 
-    // Check for duplicates (unless we are editing the same item)
+    // 1. Check for duplicates (excluding the current item being edited)
     const isDuplicate = deptBudgets.some(b => 
       b.department.toLowerCase() === trimmedName.toLowerCase() && 
       b.year === newDeptYear && 
-      `${b.department}-${b.year}` !== editingBudgetKey
+      `${b.department}-${b.year}` !== oldKey
     );
 
     if (isDuplicate) {
-      alert(`Budget untuk departemen "${trimmedName}" pada tahun ${newDeptYear} sudah ada! Silakan edit data yang sudah ada.`);
+      alert(`Budget untuk departemen "${trimmedName}" pada tahun ${newDeptYear} sudah ada!`);
       return;
     }
 
-    // Allow 0 as a valid budget value
-    const finalBudget = Number(newDeptBudget); 
-
-    if (editingBudgetKey) {
-      // UPDATE Existing
-      setDeptBudgets(prev => prev.map(b => 
-        (b.department === newDeptName && b.year === newDeptYear)
-          ? { ...b, budget: finalBudget }
-          : b
-      ));
+    if (oldKey) {
+      // --- MODE EDIT ---
+      if (oldKey === newKey) {
+        // Case A: Only Budget changed, Year and Dept are same
+        setDeptBudgets(prev => prev.map(b => 
+          (b.department === trimmedName && b.year === newDeptYear)
+            ? { ...b, budget: newDeptBudget }
+            : b
+        ));
+      } else {
+        // Case B: Year or Dept Name changed. We must Delete Old and Create New.
+        // 1. Remove the old entry
+        const tempBudgets = deptBudgets.filter(b => `${b.department}-${b.year}` !== oldKey);
+        // 2. Add the new entry with updated details
+        const newEntry = { 
+          department: trimmedName, 
+          year: newDeptYear, 
+          budget: newDeptBudget, 
+          actual: 0 
+        };
+        setDeptBudgets([...tempBudgets, newEntry]);
+      }
     } else {
-      // CREATE New
+      // --- MODE CREATE NEW ---
       const newEntry = { 
         department: trimmedName, 
         year: newDeptYear, 
-        budget: finalBudget, 
+        budget: newDeptBudget, 
         actual: 0 
       };
       setDeptBudgets(prev => [...prev, newEntry]);
@@ -178,8 +188,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     syncSettingsToParent();
   };
 
-  // --- ROLE CRUD LOGIC ---
-
+  // --- ROLE CRUD LOGIC (Unchanged) ---
   const resetRoleForm = () => {
     setEditingRoleId(null);
     setRoleFormName('');
@@ -245,7 +254,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
   };
 
-  // Format Currency Helper
   const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
   return (
@@ -403,7 +411,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </button>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Atur batas budget tahunan untuk perekrutan per divisi. Klik tombol Edit untuk mengubah nilai budget dinamis (termasuk nilai 0).
+              Atur batas budget tahunan untuk perekrutan per divisi. Klik tombol Edit untuk mengubah nilai budget atau tahun.
             </p>
 
             {/* TABLE BUDGET */}
@@ -563,14 +571,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       </div>
 
-      {/* MODAL: Add/Edit Budget */}
+      {/* MODAL: Add/Edit Budget (FIXED FOR ZERO BUDGET & YEAR EDIT) */}
       {isBudgetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5 sm:p-6">
               <div>
                 <h4 className="text-lg font-extrabold text-slate-800">{editingBudgetKey ? 'Edit Budget' : 'Tambah Budget Baru'}</h4>
-                <p className="text-xs text-slate-400">{editingBudgetKey ? 'Ubah alokasi budget untuk departemen dan tahun tertentu.' : 'Buat alokasi budget untuk departemen baru pada tahun tertentu.'}</p>
+                <p className="text-xs text-slate-400">{editingBudgetKey ? 'Ubah alokasi budget, departemen, atau tahun.' : 'Buat alokasi budget untuk departemen baru pada tahun tertentu.'}</p>
               </div>
               <button onClick={() => setIsBudgetModalOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"><X className="w-5 h-5" /></button>
             </div>
@@ -598,12 +606,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   <input
                     type="text"
                     inputMode="numeric"
-                    required
-                    // Display empty string if 0, otherwise display the number
+                    // HAPUS 'required' DI SINI AGAR BISA SAVE 0
                     value={newDeptBudget === 0 ? '' : newDeptBudget.toString()}
                     onChange={(e) => { 
                       const val = sanitizeNumberInput(e.target.value); 
-                      // If empty, set to 0. If number, set to number.
                       setNewDeptBudget(val === '' ? 0 : Number(val)); 
                     }}
                     placeholder="0"
@@ -621,7 +627,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       )}
 
-      {/* MODAL: Role Management */}
+      {/* MODAL: Role Management (Unchanged) */}
       {isRoleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
