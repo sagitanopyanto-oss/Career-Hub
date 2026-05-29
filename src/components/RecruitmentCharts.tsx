@@ -212,12 +212,13 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 
   const trendData = trendMonths.map(m => {
     // 🔹 FIX: Gunakan trim() untuk menghindari spasi ekstra di status
-    const jobsCreated = jobs.filter(j => { ... }).length;
-      const jd = new Date(j.createdAt);
-      return jd.getMonth() === m.monthNum 
-        && jd.getFullYear() === m.year 
-        && j.status === 'Aktif'; // ← ← tambahkan .trim()
-    }).length;
+    const jobsCreated = jobs.filter(j => {
+  const jd = new Date(j.createdAt);
+  // ⚠️ Gunakan trim() untuk toleransi spasi ekstra
+  return jd.getMonth() === m.monthNum &&
+         jd.getFullYear() === m.year &&
+         j.status.trim() === 'Aktif'; // ← ini kunci!
+}).length;
 
     const hiresMade = candidates.filter(c => {
       if (c.tahapProses !== 'hired' || !c.tanggalHired) return false;
