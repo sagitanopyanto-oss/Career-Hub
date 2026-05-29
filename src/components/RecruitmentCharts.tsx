@@ -211,9 +211,12 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
   }
 
   const trendData = trendMonths.map(m => {
+    // 🔹 FIX: Hanya hitung lowongan dengan status 'Aktif'
     const jobsCreated = jobs.filter(j => {
       const jd = new Date(j.createdAt);
-      return jd.getMonth() === m.monthNum && jd.getFullYear() === m.year;
+      return jd.getMonth() === m.monthNum 
+        && jd.getFullYear() === m.year 
+        && j.status === 'Aktif'; // ← Tambahan filter status
     }).length;
 
     const hiresMade = candidates.filter(c => {
