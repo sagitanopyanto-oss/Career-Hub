@@ -39,6 +39,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const allYears = Array.from(new Set([
     ...safeCandidates.map(c => c.tanggalApplied ? new Date(c.tanggalApplied).getFullYear() : null),
     ...safeJobs.map(j => j.createdAt ? new Date(j.createdAt).getFullYear() : null),
+    ...safeBudgets.map(b => b.year), // 🔹 TAMBAHKAN BARIS INI
     nowDate.getFullYear()
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
 
