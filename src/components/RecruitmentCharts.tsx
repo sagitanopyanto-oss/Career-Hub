@@ -10,6 +10,40 @@ interface RecruitmentChartsProps {
   filterQuarters: number[];
 }
 
+// 🔹 HELPER: Map posisiDilamar ke department berdasarkan keyword bisnis
+const getDepartmentFromPosition = (position: string): string => {
+  const p = position.toLowerCase();
+  
+  if (p.includes('react') || p.includes('frontend') || p.includes('backend') || 
+      p.includes('engineer') || p.includes('developer') || p.includes('tech') ||
+      p.includes('go/') || p.includes('node') || p.includes('fullstack')) {
+    return 'Technology';
+  }
+  
+  if (p.includes('hr') || p.includes('human resource') || p.includes('recruitment') || 
+      p.includes('talent') || p.includes('people') || p.includes('generalist')) {
+    return 'Human Resources';
+  }
+  
+  if (p.includes('design') || p.includes('ui') || p.includes('ux') || 
+      p.includes('product designer') || p.includes('creative')) {
+    return 'Product Design';
+  }
+  
+  if (p.includes('marketing') || p.includes('digital') || p.includes('ads') || 
+      p.includes('seo') || p.includes('content') || p.includes('brand')) {
+    return 'Marketing';
+  }
+  
+  if (p.includes('finance') || p.includes('accounting') || p.includes('treasury') || 
+      p.includes('audit') || p.includes('tax')) {
+    return 'Finance';
+  }
+  
+  // Fallback: kembalikan string asli agar tetap bisa dicocokkan secara eksak
+  return position;
+};
+
 export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
   candidates, jobs, settings,
   filterRange, filterYear, filterQuarters
@@ -40,13 +74,12 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       const budgetEntry = relevantBudgets.find(b => b.department === dept);
       const budget = budgetEntry ? budgetEntry.budget : 0;
 
-      // Candidates are ALREADY filtered by DashboardView based on global filters
-      // So we just match department name here
+      // 🔹 FIX: Gunakan mapping departemen untuk mencocokkan kandidat
+      // Candidates sudah difilter oleh DashboardView, jadi kita hanya match departemen
       const actual = candidates
         .filter(c => 
           c.tahapProses === 'hired' &&
-          (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
-           dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
+          getDepartmentFromPosition(c.posisiDilamar).toLowerCase() === dept.toLowerCase()
         )
         .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
 
@@ -68,11 +101,10 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       j.department.toLowerCase() === dept.toLowerCase() && j.status === 'Aktif'
     ).length;
 
-    // Candidates already filtered by parent
+    // 🔹 FIX: Gunakan mapping departemen yang sama untuk hired candidates
     const hiredCands = candidates.filter(c => 
       c.tahapProses === 'hired' &&
-      (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
-       dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
+      getDepartmentFromPosition(c.posisiDilamar).toLowerCase() === dept.toLowerCase()
     ).length;
 
     return { department: dept, open: openJobs, hired: hiredCands };
@@ -80,14 +112,12 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 
   // Chart 3: Tren Lowongan vs Rekrutmen - FIXED QUARTER LOGIC
   let trendMonths: { month: string; monthNum: number; year: number }[] = [];
-
+  
   if (filterQuarters.length > 0) {
-    // PRIORITY: If quarters selected, show months within those quarters
     const sortedQuarters = [...filterQuarters].sort((a, b) => a - b);
     const targetYear = filterYear === 0 ? nowDate.getFullYear() : filterYear;
-    
     sortedQuarters.forEach(q => {
-      const startMonth = (q - 1) * 3; // Q1=0, Q2=3, Q3=6, Q4=9
+      const startMonth = (q - 1) * 3;
       for (let i = 0; i < 3; i++) {
         const m = startMonth + i;
         const d = new Date(targetYear, m, 1);
@@ -114,7 +144,6 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       });
     }
   } else {
-    // Annual or All Years: Show 12 months of selected year
     const targetYear = filterYear === 0 ? nowDate.getFullYear() : filterYear;
     for (let m = 0; m < 12; m++) {
       const d = new Date(targetYear, m, 1);
@@ -127,15 +156,6 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
   }
 
   const trendData = trendMonths.map(m => {
-    // For trend chart, we need to check against ORIGINAL unfiltered data?
-    // No - requirement says "keseluruhan data dashboard mengikuti pilihan".
-    // But since candidates/jobs props are already filtered by parent,
-    // and parent filters by date range, the trend might show zeros if 
-    // the parent filter excludes those months.
-    // SOLUTION: We use the filtered props. If user selects Q1 2025,
-    // parent passes only Q1 2025 candidates. Trend chart shows Q1 2025 months.
-    // This is correct behavior per requirement.
-    
     const jobsCreated = jobs.filter(j => {
       const jd = new Date(j.createdAt);
       return jd.getMonth() === m.monthNum && jd.getFullYear() === m.year;
@@ -160,7 +180,6 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     return `Rp ${val.toLocaleString('id-ID')}`;
   };
 
-  // Generate dynamic subtitle for trend chart
   const getTrendSubtitle = () => {
     if (filterQuarters.length > 0) {
       const qLabels = filterQuarters.sort().map(q => `Q${q}`).join(', ');
@@ -190,8 +209,16 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
           {jobVsHiredData.length > 0 ? jobVsHiredData.map((item, idx) => (
             <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[40px] group">
               <div className="flex items-end gap-1 h-[200px] w-full justify-center relative">
-                <div className="w-3 sm:w-4 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" style={{ height: `${(item.open / maxJobVal) * 100}%` }} title={`Lowongan: ${item.open}`}></div>
-                <div className="w-3 sm:w-4 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" style={{ height: `${(item.hired / maxJobVal) * 100}%` }} title={`Hired: ${item.hired}`}></div>
+                <div 
+                  className="w-3 sm:w-4 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" 
+                  style={{ height: `${(item.open / maxJobVal) * 100}%` }} 
+                  title={`Lowongan: ${item.open}`}
+                ></div>
+                <div 
+                  className="w-3 sm:w-4 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" 
+                  style={{ height: `${(item.hired / maxJobVal) * 100}%` }} 
+                  title={`Hired: ${item.hired}`}
+                ></div>
               </div>
               <div className="text-center mt-2">
                 <span className="text-[10px] font-semibold text-slate-600 block truncate max-w-[60px]" title={item.department}>{item.department}</span>
@@ -261,8 +288,16 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
           {trendData.map((item, idx) => (
             <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[30px] group">
               <div className="flex items-end gap-1 h-[150px] w-full justify-center relative">
-                <div className="w-2 sm:w-3 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" style={{ height: `${(item.jobs / maxTrendVal) * 100}%` }} title={`Lowongan: ${item.jobs}`}></div>
-                <div className="w-2 sm:w-3 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" style={{ height: `${(item.hires / maxTrendVal) * 100}%` }} title={`Hired: ${item.hires}`}></div>
+                <div 
+                  className="w-2 sm:w-3 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" 
+                  style={{ height: `${(item.jobs / maxTrendVal) * 100}%` }} 
+                  title={`Lowongan: ${item.jobs}`}
+                ></div>
+                <div 
+                  className="w-2 sm:w-3 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" 
+                  style={{ height: `${(item.hires / maxTrendVal) * 100}%` }} 
+                  title={`Hired: ${item.hires}`}
+                ></div>
               </div>
               <span className="text-[9px] font-semibold text-slate-600">{item.label}</span>
               <span className="text-[8px] text-slate-400">L{item.jobs} H{item.hires}</span>
