@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Users, Briefcase, UserCheck, Stethoscope, FileCheck, Activity,
-  CalendarClock, Clock, ArrowUpRight, Award, CheckCircle,
-  DollarSign, ChevronDown, Building2
+  CalendarClock, Clock, ArrowUpRight, TrendingUp, Award, CheckCircle,
+  DollarSign, AlertTriangle, ChevronDown
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 import { RecruitmentCharts } from './RecruitmentCharts';
@@ -20,23 +20,6 @@ interface DashboardViewProps {
   setActiveMenu: (menu: string) => void;
 }
 
-// Helper mapping posisi ke departemen (konsisten dengan RecruitmentCharts)
-const getDepartmentFromPosition = (position: string): string => {
-  const p = position.toLowerCase();
-  if (p.includes('react') || p.includes('frontend') || p.includes('backend') ||
-      p.includes('engineer') || p.includes('developer') || p.includes('tech') ||
-      p.includes('go/') || p.includes('node') || p.includes('fullstack')) return 'Technology';
-  if (p.includes('hr') || p.includes('human resource') || p.includes('recruitment') ||
-      p.includes('talent') || p.includes('people') || p.includes('generalist')) return 'Human Resources';
-  if (p.includes('design') || p.includes('ui') || p.includes('ux') ||
-      p.includes('product designer') || p.includes('creative')) return 'Product Design';
-  if (p.includes('marketing') || p.includes('digital') || p.includes('ads') ||
-      p.includes('seo') || p.includes('content') || p.includes('brand')) return 'Marketing';
-  if (p.includes('finance') || p.includes('accounting') || p.includes('treasury') ||
-      p.includes('audit') || p.includes('tax')) return 'Finance';
-  return position;
-};
-
 export const DashboardView: React.FC<DashboardViewProps> = ({
   candidates, jobs, settings,
   filterRange, setFilterRange,
@@ -52,72 +35,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const safeSettings = settings || { budgetCostHiring: [], targetSlaDays: [], targetSlaManagement: 85 };
   const safeBudgets = safeSettings.budgetCostHiring || [];
 
-  // 🔹 STATE: Multi-Select Years & Departments
-  const [selectedYears, setSelectedYears] = useState<number[]>(filterYear === 0 ? [] : [filterYear]);
-  const [showYearDropdown, setShowYearDropdown] = useState(false);
-  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
-  const [showDeptDropdown, setShowDeptDropdown] = useState(false);
-
-  // Derive available years (include budget years)
+  // Derive available years safely
   const allYears = Array.from(new Set([
     ...safeCandidates.map(c => c.tanggalApplied ? new Date(c.tanggalApplied).getFullYear() : null),
     ...safeJobs.map(j => j.createdAt ? new Date(j.createdAt).getFullYear() : null),
-    ...safeBudgets.map(b => b.year),
+    ...safeBudgets.map(b => b.year), // 🔹 TAMBAHKAN BARIS INI
     nowDate.getFullYear()
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
 
-  // Derive unique departments from Jobs + Budget Settings
-  const allDepartments = useMemo(() => {
-    const depts = new Set<string>();
-    safeJobs.forEach(j => { if (j.department) depts.add(j.department); });
-    safeBudgets.forEach(b => { if (b.department) depts.add(b.department); });
-    return Array.from(depts).sort();
-  }, [safeJobs, safeBudgets]);
+  // Multi-Year Selection State
+  const [selectedYears, setSelectedYears] = useState<number[]>(filterYear === 0 ? [] : [filterYear]);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
 
-  // Sync selectedYears with external filterYear prop
-  useEffect(() => {
-    if (filterYear === 0) {
-      setSelectedYears([]);
-    } else if (!selectedYears.includes(filterYear)) {
-      setSelectedYears([filterYear]);
-    }
-  }, [filterYear]);
-
-  const toggleYear = (year: number) => {
-    const newSelected = selectedYears.includes(year)
-      ? selectedYears.filter(y => y !== year)
-      : [...selectedYears, year];
-    setSelectedYears(newSelected);
-    // Sync back to filterYear for child components
-    if (newSelected.length === 1) {
-      setFilterYear(newSelected[0]);
-    } else {
+  // Sync selectedYears to filterYear for child components
+  React.useEffect(() => {
+    if (selectedYears.length === 1) {
+      setFilterYear(selectedYears[0]);
+    } else if (selectedYears.length === 0) {
       setFilterYear(0);
     }
-  };
+  }, [selectedYears, setFilterYear]);
 
-  const toggleDept = (dept: string) => {
-    setSelectedDepts(prev =>
-      prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
+  const toggleYear = (year: number) => {
+    setSelectedYears(prev => 
+      prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year]
     );
   };
 
   const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
-
+  
   const diffInDays = (d1: string, d2: string) => {
     if (!d1 || !d2) return 0;
     return Math.max(0, Math.floor((new Date(d1).getTime() - new Date(d2).getTime()) / (1000 * 60 * 60 * 24)));
   };
 
-  // 🔹 CORE FILTER LOGIC: Supports Multi-Year + Quarter + Range
   const isWithinYearAndQuarter = (dateStr?: string) => {
     if (!dateStr) return false;
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return false;
-
+    
     // Check against selectedYears array first
     if (selectedYears.length > 0 && !selectedYears.includes(date.getFullYear())) return false;
-    // Fallback to single filterYear if selectedYears is empty
+    // Fallback to single filterYear if selectedYears is empty but filterYear is set
     else if (selectedYears.length === 0 && filterYear !== 0 && date.getFullYear() !== filterYear) return false;
 
     if (filterQuarters.length > 0) {
@@ -148,24 +107,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return true;
   };
 
-  // 🔹 Department Filter Helper
-  const matchesDepartment = (dept?: string, posisi?: string) => {
-    if (selectedDepts.length === 0) return true;
-    const checkStr = `${dept || ''} ${posisi || ''}`.toLowerCase();
-    return selectedDepts.some(d => checkStr.includes(d.toLowerCase()));
-  };
-
   const toggleQuarter = (q: number) => {
     setFilterQuarters(filterQuarters.includes(q) ? filterQuarters.filter(x => x !== q) : [...filterQuarters, q]);
   };
 
-  // 🔹 APPLY ALL FILTERS: Year + Quarter + Range + Department
-  const filteredCandidates = safeCandidates.filter(c =>
-    isWithinFilterRange(c.tanggalApplied) && matchesDepartment(undefined, c.posisiDilamar)
-  );
-  const filteredJobs = safeJobs.filter(j =>
-    isWithinFilterRange(j.createdAt) && matchesDepartment(j.department)
-  );
+  const filteredCandidates = safeCandidates.filter(c => isWithinFilterRange(c.tanggalApplied));
+  const filteredJobs = safeJobs.filter(j => isWithinFilterRange(j.createdAt));
   const displayCandidates = filteredCandidates;
 
   // Analytics Cards Data
@@ -265,7 +212,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [safeBudgets, displayCandidates, selectedYears, filterYear]);
 
   const maxAggVal = Math.max(...costHiringAggData.flatMap(d => [d.budget, d.actual]), 1);
-
+  
   const formatIDR = (val: number) => {
     if (val >= 1000000000) return `Rp ${(val / 1000000000).toFixed(1)} M`;
     if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1)} Jt`;
@@ -285,12 +232,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ];
   const maxPipelineVal = Math.max(...pipelineData.map(p => p.count), 1);
 
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setShowYearDropdown(false);
-      setShowDeptDropdown(false);
-    };
+  // Close dropdown on outside click
+  React.useEffect(() => {
+    const handleClickOutside = () => setShowYearDropdown(false);
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -323,11 +267,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800">
-          {/* 🔹 MULTI-CHECKBOX YEAR FILTER */}
+          {/* Multi-Checkbox Year Filter */}
           <div className="relative shrink-0">
             <button
-              onClick={(e) => { e.stopPropagation(); setShowYearDropdown(!showYearDropdown); setShowDeptDropdown(false); }}
-              className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg hover:border-indigo-500 transition-colors min-w-[140px]"
+              onClick={(e) => { e.stopPropagation(); setShowYearDropdown(!showYearDropdown); }}
+              className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer min-w-[140px]"
             >
               <CalendarClock className="w-3.5 h-3.5 text-indigo-400" />
               <span className="flex-1 text-left truncate">
@@ -337,14 +281,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
 
             {showYearDropdown && (
-              <div
+              <div 
                 className="absolute top-full left-0 mt-1 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="p-2 border-b border-slate-700 flex items-center justify-between">
                   <span className="text-[10px] font-bold text-slate-400 uppercase px-1">Pilih Tahun</span>
                   {selectedYears.length > 0 && (
-                    <button
+                    <button 
                       onClick={() => { setSelectedYears([]); setFilterYear(0); }}
                       className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold px-2 py-1 rounded hover:bg-slate-700"
                     >
@@ -356,8 +300,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {allYears.map(year => {
                     const isSelected = selectedYears.includes(year);
                     return (
-                      <label
-                        key={year}
+                      <label 
+                        key={year} 
                         className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-indigo-600/20 border border-indigo-500/30' : 'hover:bg-slate-700/50 border border-transparent'}`}
                       >
                         <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-500 bg-slate-700'}`}>
@@ -375,7 +319,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
 
-          {/* Quarter Filters */}
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Kuartal:</span>
             {[
@@ -411,78 +354,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
 
-          <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
-
-          {/* 🔹 MULTI-CHECKBOX DEPARTMENT FILTER */}
-          <div className="relative shrink-0">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDeptDropdown(!showDeptDropdown); setShowYearDropdown(false); }}
-              className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg hover:border-indigo-500 transition-colors min-w-[160px]"
-            >
-              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="flex-1 text-left truncate">
-                {selectedDepts.length === 0 ? 'Semua Departemen' : selectedDepts.length === 1 ? selectedDepts[0] : `${selectedDepts.length} Departemen`}
-              </span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDeptDropdown ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showDeptDropdown && (
-              <div
-                className="absolute top-full left-0 mt-1 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50 overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-2 border-b border-slate-700 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase px-1">Filter Departemen</span>
-                  {selectedDepts.length > 0 && (
-                    <button
-                      onClick={() => setSelectedDepts([])}
-                      className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold px-2 py-1 rounded hover:bg-slate-700"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-[240px] overflow-y-auto p-1.5 space-y-0.5">
-                  {allDepartments.map(dept => {
-                    const isSelected = selectedDepts.includes(dept);
-                    return (
-                      <label
-                        key={dept}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-indigo-600/20 border border-indigo-500/30' : 'hover:bg-slate-700/50 border border-transparent'}`}
-                      >
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-500 bg-slate-700'}`}>
-                          {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
-                        </div>
-                        <input type="checkbox" checked={isSelected} onChange={() => toggleDept(dept)} className="hidden" />
-                        <span className={`text-xs font-bold ${isSelected ? 'text-indigo-300' : 'text-slate-300'}`}>{dept}</span>
-                      </label>
-                    );
-                  })}
-                  {allDepartments.length === 0 && (
-                    <div className="px-3 py-4 text-center text-[10px] text-slate-500">Tidak ada data departemen</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Active Filter Summary & Reset */}
-          {(selectedYears.length > 0 || filterQuarters.length > 0 || selectedDepts.length > 0) && (
+          {(selectedYears.length > 0 || filterQuarters.length > 0) && (
             <div className="flex items-center gap-1.5 ml-auto">
               <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" />
                 {selectedYears.length > 0 && selectedYears.join(', ')}
-                {selectedYears.length > 0 && (filterQuarters.length > 0 || selectedDepts.length > 0) && ' · '}
-                {filterQuarters.length > 0 ? filterQuarters.map(q => `Q${q}`).join(', ') : ''}
-                {filterQuarters.length > 0 && selectedDepts.length > 0 && ' · '}
-                {selectedDepts.length > 0 ? `${selectedDepts.length} Dept` : ''}
+                {selectedYears.length > 0 && filterQuarters.length > 0 && ' · '}
+                {filterQuarters.length > 0 && filterQuarters.map(q => `Q${q}`).join(', ')}
               </span>
-              <button
-                onClick={() => { setSelectedYears([]); setFilterYear(0); setFilterQuarters([]); setSelectedDepts([]); }}
-                className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2"
-              >
-                Reset
-              </button>
+              <button onClick={() => { setSelectedYears([]); setFilterYear(0); setFilterQuarters([]); }} className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2">Reset</button>
             </div>
           )}
         </div>
@@ -547,7 +427,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Aggregate Cost Hiring Chart (Visual Bar) */}
+      {/* Visual Bar Chart: Cost Hiring Total Budget vs Actual */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -567,6 +447,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {costHiringAggData.length > 0 ? (
           <div className="relative h-64 w-full border-b border-l border-slate-200 pl-10 pb-2">
+            {/* Y-Axis Labels */}
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
               {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
                 const val = maxAggVal * ratio;
@@ -580,6 +461,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               })}
             </div>
 
+            {/* Bars Container */}
             <div className="absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2">
               {costHiringAggData.map((item) => {
                 const budgetHeight = (item.budget / maxAggVal) * 100;
@@ -589,11 +471,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 return (
                   <div key={item.year} className="flex flex-col items-center gap-2 group relative flex-1 max-w-[80px]">
+                    {/* Tooltip on Hover */}
                     <div className="absolute -top-28 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px]">
                       <div className="font-bold mb-2 text-xs border-b border-slate-600 pb-1">Tahun {item.year}</div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                        <span className="text-slate-300">Budget:</span> <span className="text-right font-semibold">{formatIDR(item.budget)}</span>
-                        <span className="text-slate-300">Actual:</span> <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>{formatIDR(item.actual)}</span>
+                        <span className="text-slate-300">Budget:</span>  <span className="text-right font-semibold">{formatIDR(item.budget)}</span>
+                        <span className="text-slate-300">Actual:</span>  <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>{formatIDR(item.actual)}</span>
                         <span className="text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1">Variance:</span>
                         <span className={`col-span-2 text-right font-bold ${variance && Number(variance) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                           {variance !== null ? `${Number(variance) >= 0 ? '+' : ''}${variance}%` : '-'}
@@ -601,7 +484,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
 
+                    {/* The Bars */}
                     <div className="flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1">
+                      {/* Budget Bar */}
                       <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/bar">
                         <div
                           className="w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative"
@@ -609,12 +494,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           {item.budget > 0 && (
                             <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap">
-                              {item.budget >= 1000000 ? `${(item.budget / 1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
+                              {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
                             </span>
                           )}
                         </div>
                       </div>
 
+                      {/* Actual Bar */}
                       <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/act">
                         <div
                           className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
@@ -622,13 +508,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           {item.actual > 0 && (
                             <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {item.actual >= 1000000 ? `${(item.actual / 1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
+                              {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
 
+                    {/* X-Axis Label */}
                     <div className="text-center mt-2">
                       <span className="text-xs font-bold text-slate-600 block">{item.year}</span>
                     </div>
