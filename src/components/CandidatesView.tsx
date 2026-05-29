@@ -34,16 +34,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [filterAtsScore, setFilterAtsScore] = useState('All');
   const [filterUsia, setFilterUsia] = useState('All');
   const [filterExpectedSalary, setFilterExpectedSalary] = useState('All');
-
   const [selectedCandidateATS, setSelectedCandidateATS] = useState<Candidate | null>(null);
   const [previewCV, setPreviewCV] = useState<Candidate | null>(null);
   const [selectedCandidateEmail, setSelectedCandidateEmail] = useState<Candidate | null>(null);
   const [emailStage, setEmailStage] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
   const [emailAttachments, setEmailAttachments] = useState<{ name: string; size: number; type: string; dataUrl: string }[]>([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
-
   const [formNama, setFormNama] = useState('');
   const [formTelepon, setFormTelepon] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -64,7 +61,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [formCvDataUrl, setFormCvDataUrl] = useState('');
   const [formCvMimeType, setFormCvMimeType] = useState('');
   const [formKeterangan, setFormKeterangan] = useState('');
-
   const [formTanggalApplied, setFormTanggalApplied] = useState(new Date().toISOString().split('T')[0]);
   const [formTanggalScreening, setFormTanggalScreening] = useState('');
   const [formTanggalInterview, setFormTanggalInterview] = useState('');
@@ -80,23 +76,22 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
   const openWhatsApp = (cand: Candidate) => {
-    if (!canWhatsapp) { 
-      alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.\nHubungi administrator jika Anda memerlukan akses ini.'); 
-      return; 
+    if (!canWhatsapp) {
+      alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.\nHubungi administrator jika Anda memerlukan akses ini.');
+      return;
     }
-    if (!settings.whatsappSettings.enabled) { 
-      alert('Fitur WhatsApp konfirmasi sedang dinonaktifkan pada menu Pengaturan.'); 
-      return; 
+    if (!settings.whatsappSettings.enabled) {
+      alert('Fitur WhatsApp konfirmasi sedang dinonaktifkan pada menu Pengaturan.');
+      return;
     }
-    
     let phone = cand.telepon.replace(/[^0-9]/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.substring(1);
     else if (!phone.startsWith('62')) phone = '62' + phone;
-    
+
     const draft = settings.whatsappSettings.confirmationTemplate
       .replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar)
       .replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
-      
+
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank');
   };
 
@@ -166,7 +161,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     element.href = url;
-    element.download = cand.cvName.includes('.pdf') ? cand.cvName : cand.cvName.replace(/\.[^.]+$/, '') + '.pdf';
+    element.download = cand.cvName.includes('.pdf') ? cand.cvName : cand.cvName.replace(/.[^.]+$/, '') + '.pdf';
     document.body.appendChild(element);
     setTimeout(() => { element.click(); document.body.removeChild(element); URL.revokeObjectURL(url); }, 400);
   };
@@ -252,7 +247,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       else missingSkills.push(s);
     });
     const meetsThreshold = cand.ratingKecocokan >= settings.autoScreeningATS;
-
     return (
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
@@ -462,52 +456,122 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     const template = settings.emailSettings.templates[emailStage];
     const replacedSubject = template.subject.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
     const replacedBody = template.body.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
-
     const formatFileSize = (bytes: number): string => {
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     };
 
-    // 🔹 PERBAIKAN FINAL: Logika Email Universal + Fallback Copy
-    const handleSendEmail = () => {
+    // 🔹 PERBAIKAN FINAL: Hybrid Smart Email (Gmail Web + Desktop + Fallback)
+    const handleSendEmail = async () => {
       const subject = replacedSubject;
       let body = replacedBody;
 
-      if (emailAttachments.length > 0) {
-        const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
-        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
-      }
-
-      // Siapkan teks lengkap untuk dicopy (Fallback Utama)
+      // 1. Siapkan teks lengkap untuk fallback copy-paste
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // Coba buka mailto: universal (Outlook, Thunderbird, Gmail Web, dll)
-      const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
-      // Deteksi Mobile untuk UX yang lebih baik
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // 2. Auto-download semua attachment SEBELUM membuka email client
+      const allFilesToDownload: { name: string; dataUrl: string }[] = [];
 
-      if (isMobile) {
-        window.location.href = mailtoLink;
-        navigator.clipboard.writeText(fullEmailText).then(() => {
-           alert('📱 Mode Mobile Terdeteksi\n\n1. Aplikasi email seharusnya telah terbuka.\n2. Jika tidak, Template & Alamat Tujuan SUDAH DISALIN ke clipboard.\n3. Silakan Paste (Tempel) di kolom Subjek & Isi Pesan.');
-        }).catch(() => {
-           alert('⚠️ Gagal menyalin template. Silakan copy manual dari preview di atas.');
-        });
-      } else {
-        // Desktop: Coba buka mailto, lalu beri instruksi paste jika gagal/diblokir
-        window.location.href = mailtoLink;
-        
-        // Karena kita tidak bisa mendeteksi apakah mailto berhasil dibuka atau diblokir dengan pasti di semua browser,
-        // Kita asumsikan user perlu instruksi paste sebagai backup yang aman.
-        navigator.clipboard.writeText(fullEmailText).then(() => {
-           alert('✅ Template Email Berhasil Disalin!\n\n1. Aplikasi email default Anda akan terbuka.\n2. Pastikan alamat tujuan sudah terisi.\n3. PASTE (Ctrl+V / Cmd+V) di kolom Subjek dan Isi Pesan.\n4. Lampirkan file secara manual jika diperlukan.');
-        }).catch(() => {
-           alert('⚠️ Gagal menyalin template otomatis. Silakan copy manual dari preview Subject & Body di atas, lalu paste ke email Anda.');
-        });
+      // Tambahkan CV kandidat jika ada
+      if (cand.cvDataUrl && cand.cvName) {
+        allFilesToDownload.push({ name: cand.cvName, dataUrl: cand.cvDataUrl });
       }
 
+      // Tambahkan attachment manual yang diupload user
+      emailAttachments.forEach(att => {
+        allFilesToDownload.push({ name: att.name, dataUrl: att.dataUrl });
+      });
+
+      // Download semua file satu per satu
+      for (const file of allFilesToDownload) {
+        try {
+          const link = document.createElement('a');
+          link.href = file.dataUrl;
+          link.download = file.name;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          // Delay kecil antar download agar browser tidak memblokir
+          await new Promise(resolve => setTimeout(resolve, 400));
+        } catch (err) {
+          console.error(`Gagal mendownload ${file.name}:`, err);
+        }
+      }
+
+      // 3. Deteksi apakah user menggunakan Gmail di browser
+      const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
+      let isGoogleLoggedIn = false;
+      try {
+        const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
+        isGoogleLoggedIn = response.type === 'opaque' || response.ok;
+      } catch {
+        isGoogleLoggedIn = false;
+      }
+      const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
+
+      // 4. Buka email client sesuai deteksi
+      if (useGmailCompose) {
+        // ─── GMAIL WEB: Buka tab baru Gmail Compose ───
+        const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        const newTab = window.open(gmailComposeUrl, '_blank');
+
+        if (newTab) {
+          if (allFilesToDownload.length > 0) {
+            alert(
+              `✅ Gmail Compose terbuka di tab baru!\n\n` +
+              `📎 ${allFilesToDownload.length} file sudah didownload otomatis ke folder Downloads Anda:\n` +
+              allFilesToDownload.map(f => `• ${f.name}`).join('\n') + `\n\n` +
+              `Silakan klik ikon 📎 (Attach) di Gmail dan pilih file yang baru saja terdownload.`
+            );
+          } else {
+            alert('✅ Gmail Compose terbuka di tab baru dengan Subject & Body terisi otomatis.');
+          }
+        } else {
+          // Popup diblokir → fallback copy
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+          alert(
+            `⚠️ Tab Gmail diblokir oleh browser.\n\n` +
+            `Template email SUDAH DISALIN ke clipboard.\n` +
+            `Silakan buka Gmail manual dan Paste (Ctrl+V).`
+          );
+        }
+      } else {
+        // ─── DESKTOP EMAIL (Outlook/Thunderbird/dll): mailto: di tab baru ───
+        const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+        // Gunakan window.open alih-alih window.location.href agar tab CareerHub TETAP TERBUKA
+        const mailtoTab = window.open(mailtoLink, '_blank');
+
+        // Tunggu sebentar lalu beri instruksi
+        setTimeout(async () => {
+          // Copy template sebagai backup
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+
+          if (allFilesToDownload.length > 0) {
+            alert(
+              `📧 Email Desktop Terdeteksi (Outlook/Thunderbird/dll)\n\n` +
+              `✅ Aplikasi email seharusnya sudah terbuka di tab baru dengan Subject & Body terisi.\n` +
+              `✅ Template email juga SUDAH DISALIN ke clipboard (Ctrl+V sebagai backup).\n\n` +
+              `📎 ${allFilesToDownload.length} FILE SUDAH DIDOWNLOAD KE FOLDER DOWNLOADS:\n` +
+              allFilesToDownload.map(f => `   • ${f.name}`).join('\n') + `\n\n` +
+              `⚠️ PENTING: Email desktop TIDAK mendukung lampiran otomatis via mailto.\n` +
+              `Silakan klik tombol 📎 Attach di email Anda, lalu pilih file dari folder Downloads.`
+            );
+          } else {
+            alert(
+              `📧 Email Desktop Terdeteksi\n\n` +
+              `✅ Aplikasi email seharusnya sudah terbuka di tab baru.\n` +
+              `✅ Template SUDAH DISALIN ke clipboard (Ctrl+V sebagai backup).\n\n` +
+              `Jika email tidak terbuka, silakan paste template secara manual.`
+            );
+          }
+        }, 800);
+
+        // Jika mailtoTab null (diblokir), instruksi tetap muncul via setTimeout di atas
+      }
+
+      // 5. Reset state modal
       setSelectedCandidateEmail(null);
       setEmailAttachments([]);
     };
