@@ -11,16 +11,21 @@ interface RecruitmentChartsProps {
 }
 
 export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
-  candidates, jobs, settings,
-  filterRange, filterYear, filterQuarters
+  candidates, jobs, settings, filterYear
 }) => {
-  const nowDate = new Date();
+  // Helper: Normalisasi & Matching Departemen yang Lebih Toleran
+  const normalize = (s: string) => s?.toLowerCase().trim() || '';
+  const isMatchDept = (pos: string, dept: string) => {
+    const p = normalize(pos);
+    const d = normalize(dept);
+    if (!p || !d) return false;
+    return p === d || p.includes(d) || d.includes(p);
+  };
 
-  // Helper: Get Unique Departments & Aggregate Data
   const getChartData = () => {
     if (!settings.budgetCostHiring) return { depts: [], costData: [] };
-    
-    let relevantBudgets = settings.budgetCostHiring.filter(b => 
+
+    let relevantBudgets = settings.budgetCostHiring.filter(b =>
       filterYear === 0 ? true : b.year === filterYear
     );
 
@@ -40,13 +45,12 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       const budgetEntry = relevantBudgets.find(b => b.department === dept);
       const budget = budgetEntry ? budgetEntry.budget : 0;
 
-      // Candidates are ALREADY filtered by DashboardView based on global filters
-      // So we just match department name here
+      // HITUNG REAL COST: Hanya kandidat hired yang match departemen
       const actual = candidates
-        .filter(c => 
+        .filter(c =>
           c.tahapProses === 'hired' &&
-          (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
-           dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
+          c.expectedSalary && c.expectedSalary > 0 &&
+          isMatchDept(c.posisiDilamar, dept)
         )
         .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
 
@@ -62,93 +66,55 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 
   const { depts: departments, costData } = getChartData();
 
-  // Chart 1: Lowongan vs Hired per Departemen
+  // CHART 1: Lowongan vs Hired per Departemen
   const jobVsHiredData = departments.map(dept => {
     const openJobs = jobs.filter(j =>
-      j.department.toLowerCase() === dept.toLowerCase() && j.status === 'Aktif'
+      normalize(j.department) === normalize(dept) && j.status === 'Aktif'
     ).length;
 
-    // Candidates already filtered by parent
-    const hiredCands = candidates.filter(c => 
+    // BAR HIRED: Gunakan isMatchDept agar lebih fleksibel terhadap variasi nama posisi
+    const hiredCands = candidates.filter(c =>
       c.tahapProses === 'hired' &&
-      (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
-       dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
+      isMatchDept(c.posisiDilamar, dept)
     ).length;
 
     return { department: dept, open: openJobs, hired: hiredCands };
   });
 
-  // Chart 3: Tren Lowongan vs Rekrutmen - FIXED QUARTER LOGIC
+  // CHART 3: Tren Lowongan vs Rekrutmen
+  const nowDate = new Date();
   let trendMonths: { month: string; monthNum: number; year: number }[] = [];
 
-  if (filterQuarters.length > 0) {
-    // PRIORITY: If quarters selected, show months within those quarters
-    const sortedQuarters = [...filterQuarters].sort((a, b) => a - b);
-    const targetYear = filterYear === 0 ? nowDate.getFullYear() : filterYear;
-    
-    sortedQuarters.forEach(q => {
-      const startMonth = (q - 1) * 3; // Q1=0, Q2=3, Q3=6, Q4=9
-      for (let i = 0; i < 3; i++) {
-        const m = startMonth + i;
-        const d = new Date(targetYear, m, 1);
-        trendMonths.push({
-          month: d.toLocaleString('id-ID', { month: 'short' }),
-          monthNum: m,
-          year: targetYear
-        });
-      }
-    });
-  } else if (filterRange === 'month') {
-    trendMonths.push({
-      month: nowDate.toLocaleString('id-ID', { month: 'short', year: '2-digit' }),
-      monthNum: nowDate.getMonth(),
-      year: nowDate.getFullYear()
-    });
-  } else if (filterRange === '6months') {
+  if (filterYear !== 0) {
+    for (let m = 0; m < 12; m++) {
+      const d = new Date(filterYear, m, 1);
+      trendMonths.push({
+        month: d.toLocaleString('id-ID', { month: 'short' }),
+        monthNum: m, year: filterYear
+      });
+    }
+  } else {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(nowDate.getFullYear(), nowDate.getMonth() - i, 1);
       trendMonths.push({
         month: d.toLocaleString('id-ID', { month: 'short', year: '2-digit' }),
-        monthNum: d.getMonth(),
-        year: d.getFullYear()
-      });
-    }
-  } else {
-    // Annual or All Years: Show 12 months of selected year
-    const targetYear = filterYear === 0 ? nowDate.getFullYear() : filterYear;
-    for (let m = 0; m < 12; m++) {
-      const d = new Date(targetYear, m, 1);
-      trendMonths.push({
-        month: d.toLocaleString('id-ID', { month: 'short' }),
-        monthNum: m,
-        year: targetYear
+        monthNum: d.getMonth(), year: d.getFullYear()
       });
     }
   }
 
-  const trendData = trendMonths.map(m => {
-    // For trend chart, we need to check against ORIGINAL unfiltered data?
-    // No - requirement says "keseluruhan data dashboard mengikuti pilihan".
-    // But since candidates/jobs props are already filtered by parent,
-    // and parent filters by date range, the trend might show zeros if 
-    // the parent filter excludes those months.
-    // SOLUTION: We use the filtered props. If user selects Q1 2025,
-    // parent passes only Q1 2025 candidates. Trend chart shows Q1 2025 months.
-    // This is correct behavior per requirement.
-    
-    const jobsCreated = jobs.filter(j => {
+  const trendData = trendMonths.map(m => ({
+    label: m.month,
+    jobs: jobs.filter(j => {
       const jd = new Date(j.createdAt);
       return jd.getMonth() === m.monthNum && jd.getFullYear() === m.year;
-    }).length;
-
-    const hiresMade = candidates.filter(c => {
+    }).length,
+    hires: candidates.filter(c => {
       if (c.tahapProses !== 'hired' || !c.tanggalHired) return false;
       const hd = new Date(c.tanggalHired);
       return hd.getMonth() === m.monthNum && hd.getFullYear() === m.year;
-    }).length;
-
-    return { label: m.month, jobs: jobsCreated, hires: hiresMade };
-  });
+    }).length
+  }));
 
   const maxJobVal = Math.max(...jobVsHiredData.map(d => Math.max(d.open, d.hired)), 1);
   const maxCostVal = Math.max(...costData.map(d => Math.max(d.budget, d.actual)), 1);
@@ -160,22 +126,9 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     return `Rp ${val.toLocaleString('id-ID')}`;
   };
 
-  // Generate dynamic subtitle for trend chart
-  const getTrendSubtitle = () => {
-    if (filterQuarters.length > 0) {
-      const qLabels = filterQuarters.sort().map(q => `Q${q}`).join(', ');
-      const yr = filterYear === 0 ? nowDate.getFullYear() : filterYear;
-      return `Statistik Bulanan ${qLabels} Tahun ${yr}`;
-    }
-    if (filterRange === 'month') return 'Statistik Bulan Ini';
-    if (filterRange === '6months') return 'Statistik 6 Bulan Terakhir';
-    return `Statistik Bulanan Tahun ${filterYear === 0 ? nowDate.getFullYear() : filterYear}`;
-  };
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      
-      {/* CHART 1: Lowongan vs Hired */}
+      {/* CHART 1 */}
       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -199,12 +152,12 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
               </div>
             </div>
           )) : (
-            <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data departemen untuk periode ini.</div>
+            <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data departemen untuk tahun ini.</div>
           )}
         </div>
       </div>
 
-      {/* CHART 2: Cost Hiring per Departemen */}
+      {/* CHART 2 */}
       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -240,17 +193,19 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
               </div>
             </div>
           )) : (
-            <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data budget untuk periode ini.</div>
+            <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data budget untuk tahun ini.</div>
           )}
         </div>
       </div>
 
-      {/* CHART 3: Tren Lowongan vs Rekrutmen */}
+      {/* CHART 3 */}
       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm lg:col-span-2">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm sm:text-base">Tren Lowongan vs Rekrutmen</h3>
-            <p className="text-slate-400 text-[11px] sm:text-xs">{getTrendSubtitle()}</p>
+            <p className="text-slate-400 text-[11px] sm:text-xs">
+              {filterYear !== 0 ? `Statistik Bulanan Tahun ${filterYear}` : 'Statistik 6 Bulan Terakhir'}
+            </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-bold">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> Lowongan Baru</span>
@@ -270,7 +225,6 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
           ))}
         </div>
       </div>
-
     </div>
   );
 };
