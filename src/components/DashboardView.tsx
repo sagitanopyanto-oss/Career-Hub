@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   Users, Briefcase, UserCheck, Stethoscope, FileCheck, Activity,
-  CalendarClock, Clock, ArrowUpRight, TrendingUp, Award, CheckCircle,
-  DollarSign, AlertTriangle, ChevronDown, Building2
+  CalendarClock, Clock, ArrowUpRight, Award, CheckCircle,
+  DollarSign, ChevronDown, Building2
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 import { RecruitmentCharts } from './RecruitmentCharts';
@@ -20,7 +20,7 @@ interface DashboardViewProps {
   setActiveMenu: (menu: string) => void;
 }
 
-// Helper untuk mapping posisi kandidat ke departemen (konsisten dengan RecruitmentCharts)
+// Helper mapping posisi ke departemen (konsisten dengan RecruitmentCharts)
 const getDepartmentFromPosition = (position: string): string => {
   const p = position.toLowerCase();
   if (p.includes('react') || p.includes('frontend') || p.includes('backend') ||
@@ -52,11 +52,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const safeSettings = settings || { budgetCostHiring: [], targetSlaDays: [], targetSlaManagement: 85 };
   const safeBudgets = safeSettings.budgetCostHiring || [];
 
-  // 🔹 STATE: Multi-Select Departments
+  // 🔹 STATE: Multi-Select Years & Departments
+  const [selectedYears, setSelectedYears] = useState<number[]>(filterYear === 0 ? [] : [filterYear]);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
 
-  // Derive available years safely (include budget years)
+  // Derive available years (include budget years)
   const allYears = Array.from(new Set([
     ...safeCandidates.map(c => c.tanggalApplied ? new Date(c.tanggalApplied).getFullYear() : null),
     ...safeJobs.map(j => j.createdAt ? new Date(j.createdAt).getFullYear() : null),
@@ -64,13 +66,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     nowDate.getFullYear()
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
 
-  // 🔹 Derive unique departments from Jobs + Budget Settings
+  // Derive unique departments from Jobs + Budget Settings
   const allDepartments = useMemo(() => {
     const depts = new Set<string>();
     safeJobs.forEach(j => { if (j.department) depts.add(j.department); });
     safeBudgets.forEach(b => { if (b.department) depts.add(b.department); });
     return Array.from(depts).sort();
   }, [safeJobs, safeBudgets]);
+
+  // Sync selectedYears with external filterYear prop
+  useEffect(() => {
+    if (filterYear === 0) {
+      setSelectedYears([]);
+    } else if (!selectedYears.includes(filterYear)) {
+      setSelectedYears([filterYear]);
+    }
+  }, [filterYear]);
+
+  const toggleYear = (year: number) => {
+    const newSelected = selectedYears.includes(year)
+      ? selectedYears.filter(y => y !== year)
+      : [...selectedYears, year];
+    setSelectedYears(newSelected);
+    // Sync back to filterYear for child components
+    if (newSelected.length === 1) {
+      setFilterYear(newSelected[0]);
+    } else {
+      setFilterYear(0);
+    }
+  };
+
+  const toggleDept = (dept: string) => {
+    setSelectedDepts(prev =>
+      prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
+    );
+  };
 
   const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
 
@@ -79,11 +109,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return Math.max(0, Math.floor((new Date(d1).getTime() - new Date(d2).getTime()) / (1000 * 60 * 60 * 24)));
   };
 
+  // 🔹 CORE FILTER LOGIC: Supports Multi-Year + Quarter + Range
   const isWithinYearAndQuarter = (dateStr?: string) => {
     if (!dateStr) return false;
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return false;
-    if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
+
+    // Check against selectedYears array first
+    if (selectedYears.length > 0 && !selectedYears.includes(date.getFullYear())) return false;
+    // Fallback to single filterYear if selectedYears is empty
+    else if (selectedYears.length === 0 && filterYear !== 0 && date.getFullYear() !== filterYear) return false;
+
     if (filterQuarters.length > 0) {
       const q = getQuarter(date);
       if (!filterQuarters.includes(q)) return false;
@@ -95,8 +131,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (!dateStr) return false;
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return false;
+
     if (filterQuarters.length > 0) return isWithinYearAndQuarter(dateStr);
-    if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
+
+    // Year filter check
+    if (selectedYears.length > 0 && !selectedYears.includes(date.getFullYear())) return false;
+    else if (selectedYears.length === 0 && filterYear !== 0 && date.getFullYear() !== filterYear) return false;
 
     if (filterRange === 'month') {
       return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
@@ -119,13 +159,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setFilterQuarters(filterQuarters.includes(q) ? filterQuarters.filter(x => x !== q) : [...filterQuarters, q]);
   };
 
-  const toggleDept = (dept: string) => {
-    setSelectedDepts(prev =>
-      prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
-    );
-  };
-
-  // Apply ALL filters including Department
+  // 🔹 APPLY ALL FILTERS: Year + Quarter + Range + Department
   const filteredCandidates = safeCandidates.filter(c =>
     isWithinFilterRange(c.tanggalApplied) && matchesDepartment(undefined, c.posisiDilamar)
   );
@@ -198,7 +232,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
     .slice(0, 5);
 
-  // Aggregate Cost Hiring Chart Data
+  // Aggregate Cost Hiring Chart Data (Visual Bar Chart)
   const costHiringAggData = useMemo(() => {
     const budgetByYear = safeBudgets.reduce((acc, b) => {
       acc[b.year] = (acc[b.year] || 0) + b.budget;
@@ -216,7 +250,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const allYearsSet = new Set([...Object.keys(budgetByYear), ...Object.keys(actualByYear)].map(Number));
     let chartYears = Array.from(allYearsSet).sort((a, b) => a - b);
 
-    if (filterYear !== 0) {
+    // Filter chart years based on selection
+    if (selectedYears.length > 0) {
+      chartYears = chartYears.filter(y => selectedYears.includes(y));
+    } else if (filterYear !== 0) {
       chartYears = chartYears.filter(y => y === filterYear);
     }
 
@@ -225,7 +262,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       budget: budgetByYear[year] || 0,
       actual: actualByYear[year] || 0
     }));
-  }, [safeBudgets, displayCandidates, filterYear]);
+  }, [safeBudgets, displayCandidates, selectedYears, filterYear]);
 
   const maxAggVal = Math.max(...costHiringAggData.flatMap(d => [d.budget, d.actual]), 1);
 
@@ -250,7 +287,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Close dropdowns on outside click
   useEffect(() => {
-    const handleClickOutside = () => setShowDeptDropdown(false);
+    const handleClickOutside = () => {
+      setShowYearDropdown(false);
+      setShowDeptDropdown(false);
+    };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -283,17 +323,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800">
-          {/* Year Filter */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Tahun:</span>
-            <select
-              value={filterYear}
-              onChange={(e) => { setFilterYear(Number(e.target.value)); setFilterQuarters([]); }}
-              className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
+          {/* 🔹 MULTI-CHECKBOX YEAR FILTER */}
+          <div className="relative shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowYearDropdown(!showYearDropdown); setShowDeptDropdown(false); }}
+              className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg hover:border-indigo-500 transition-colors min-w-[140px]"
             >
-              <option value={0}>Semua Tahun</option>
-              {allYears.map(y => (<option key={y} value={y}>{y}</option>))}
-            </select>
+              <CalendarClock className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="flex-1 text-left truncate">
+                {selectedYears.length === 0 ? 'Semua Tahun' : selectedYears.length === 1 ? `${selectedYears[0]}` : `${selectedYears.length} Tahun`}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showYearDropdown && (
+              <div
+                className="absolute top-full left-0 mt-1 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-2 border-b border-slate-700 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase px-1">Pilih Tahun</span>
+                  {selectedYears.length > 0 && (
+                    <button
+                      onClick={() => { setSelectedYears([]); setFilterYear(0); }}
+                      className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold px-2 py-1 rounded hover:bg-slate-700"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-[240px] overflow-y-auto p-1.5 space-y-0.5">
+                  {allYears.map(year => {
+                    const isSelected = selectedYears.includes(year);
+                    return (
+                      <label
+                        key={year}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-indigo-600/20 border border-indigo-500/30' : 'hover:bg-slate-700/50 border border-transparent'}`}
+                      >
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-500 bg-slate-700'}`}>
+                          {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                        </div>
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleYear(year)} className="hidden" />
+                        <span className={`text-xs font-bold ${isSelected ? 'text-indigo-300' : 'text-slate-300'}`}>{year}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
@@ -336,10 +413,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
 
-          {/* 🔹 NEW: DEPARTMENT MULTI-SELECT DROPDOWN */}
+          {/* 🔹 MULTI-CHECKBOX DEPARTMENT FILTER */}
           <div className="relative shrink-0">
             <button
-              onClick={(e) => { e.stopPropagation(); setShowDeptDropdown(!showDeptDropdown); }}
+              onClick={(e) => { e.stopPropagation(); setShowDeptDropdown(!showDeptDropdown); setShowYearDropdown(false); }}
               className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg hover:border-indigo-500 transition-colors min-w-[160px]"
             >
               <Building2 className="w-3.5 h-3.5 text-indigo-400" />
@@ -390,18 +467,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Active Filter Summary & Reset */}
-          {(filterYear !== 0 || filterQuarters.length > 0 || selectedDepts.length > 0) && (
+          {(selectedYears.length > 0 || filterQuarters.length > 0 || selectedDepts.length > 0) && (
             <div className="flex items-center gap-1.5 ml-auto">
               <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" />
-                {filterYear !== 0 ? `${filterYear}` : ''}
-                {filterYear !== 0 && (filterQuarters.length > 0 || selectedDepts.length > 0) && ' · '}
+                {selectedYears.length > 0 && selectedYears.join(', ')}
+                {selectedYears.length > 0 && (filterQuarters.length > 0 || selectedDepts.length > 0) && ' · '}
                 {filterQuarters.length > 0 ? filterQuarters.map(q => `Q${q}`).join(', ') : ''}
                 {filterQuarters.length > 0 && selectedDepts.length > 0 && ' · '}
                 {selectedDepts.length > 0 ? `${selectedDepts.length} Dept` : ''}
               </span>
               <button
-                onClick={() => { setFilterYear(0); setFilterQuarters([]); setSelectedDepts([]); }}
+                onClick={() => { setSelectedYears([]); setFilterYear(0); setFilterQuarters([]); setSelectedDepts([]); }}
                 className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2"
               >
                 Reset
@@ -470,7 +547,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Aggregate Cost Hiring Chart */}
+      {/* Aggregate Cost Hiring Chart (Visual Bar) */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -479,7 +556,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </h3>
             <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5">
               Perbandingan total alokasi budget vs realisasi pengeluaran per tahun
-              {filterYear !== 0 && <span className="font-bold text-indigo-600"> (Tahun {filterYear})</span>}
+              {selectedYears.length > 0 && <span className="font-bold text-indigo-600"> ({selectedYears.join(', ')})</span>}
             </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-bold">
