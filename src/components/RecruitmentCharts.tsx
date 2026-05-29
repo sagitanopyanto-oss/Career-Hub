@@ -126,6 +126,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       }
 
       // Calculate Actual Spending
+      // Only count hires that fall into the current Filter Context
       const actual = candidates
         .filter(c => 
           c.tahapProses === 'hired' &&
@@ -171,7 +172,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
          </div >
 
          <div className= "space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar " >
-          {costData.length  > 0 ? costData.map((item, idx) = > (
+          {costData.length  > 0 ? costData.map((item, idx) => (
              <div key={idx} className= "space-y-1 p-2 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200 " >
                <div className= "flex justify-between items-start text-xs font-semibold " >
                  <div className="flex flex-col">
