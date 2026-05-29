@@ -3,12 +3,13 @@ import {
   Plus, Search, Edit3, Trash2, Eye, Download, FileText, Sparkles,
   AlertTriangle, X, CheckCircle, Filter, Mail, Send, MessageCircle
 } from 'lucide-react';
-import { Candidate, Job, AppSettings } from '../data/mockData';
+import { Candidate, Job, AppSettings, AdminUser } from '../data/mockData'; // 🔹 TAHAP 3: Import AdminUser
 
 interface CandidatesViewProps {
   candidates: Candidate[];
   jobs: Job[];
   settings: AppSettings;
+  currentUser?: AdminUser | null; // 🔹 TAHAP 3: Prop baru
   onAddCandidate: (candidate: Candidate) => void;
   onUpdateCandidate: (candidate: Candidate) => void;
   onDeleteCandidate: (id: string) => void;
@@ -20,7 +21,7 @@ interface CandidatesViewProps {
 }
 
 export const CandidatesView: React.FC<CandidatesViewProps> = ({
-  candidates, jobs, settings,
+  candidates, jobs, settings, currentUser, // 🔹 TAHAP 3: Destructure currentUser
   onAddCandidate, onUpdateCandidate, onDeleteCandidate,
   canCreate = true, canUpdate = true, canDelete = true,
   canEmail = true, canWhatsapp = true
@@ -403,13 +404,15 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     const replacedSubject = template.subject.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
     const replacedBody = template.body.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
 
-    // 🔹 PERBAIKAN FINAL: Tanpa Upload, Tab Tidak Tertutup, Manual Attach
+    // 🔹 TAHAP 3: Tentukan pengirim berdasarkan currentUser atau fallback ke settings
+    const senderName = currentUser?.nama || settings.emailSettings.senderName;
+    const senderEmail = currentUser?.email || settings.emailSettings.senderEmail;
+
     const handleSendEmail = async () => {
       const subject = replacedSubject;
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // Deteksi Gmail Web
       const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
       let isGoogleLoggedIn = false;
       try {
@@ -421,7 +424,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // ─── GMAIL WEB: Buka tab baru Gmail Compose ───
         const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         const newTab = window.open(gmailComposeUrl, '_blank');
 
@@ -435,7 +437,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
             `   sebelum mengirim email agar file siap dilampirkan.`
           );
         } else {
-          // Popup diblokir → fallback copy
           await navigator.clipboard.writeText(fullEmailText).catch(() => {});
           alert(
             `⚠️ Tab Gmail diblokir oleh browser.\n\n` +
@@ -445,7 +446,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
           );
         }
       } else {
-        // ─── DESKTOP EMAIL: mailto: di tab baru + copy template ───
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
 
@@ -512,13 +512,17 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 <label className="text-xs font-bold text-slate-600 block mb-1">Isi Email:</label>
                 <div className="w-full text-xs font-medium px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[150px]">{replacedBody}</div>
               </div>
+              {/* 🔹 TAHAP 3: Tampilkan pengirim berdasarkan currentUser */}
               <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-xs">
                 <p className="font-bold text-indigo-900 mb-1">Pengirim:</p>
-                <p className="text-indigo-700">{settings.emailSettings.senderName} &lt;{settings.emailSettings.senderEmail}&gt;</p>
+                <p className="text-indigo-700">{senderName} &lt;{senderEmail}&gt;</p>
+                {currentUser && (
+                  <p className="text-[10px] text-indigo-500 mt-1">📧 Menggunakan email akun Anda yang sedang login</p>
+                )}
               </div>
             </div>
 
-            {/* 🔹 INFO BOX: Pengganti Upload Section */}
+            {/* INFO BOX: Pengganti Upload Section */}
             <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
