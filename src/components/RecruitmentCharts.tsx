@@ -59,32 +59,70 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 }) => {
   const nowDate = new Date();
 
-  // Helper: Get Unique Departments & Aggregate Data
+  // Helper: Get Unique Departments & Aggregate Data with FALLBACK LOGIC
   const getChartData = () => {
     if (!settings.budgetCostHiring) return { depts: [], costData: [] };
 
-    let relevantBudgets = settings.budgetCostHiring.filter(b => 
-      filterYear === 0 ? true : b.year === filterYear
-    );
+    // 1. Build a Map of All Budgets for Easy Lookup: { DeptName: { Year: Amount } }
+    const allBudgetsMap: Record<string, Record<number, number>> = {};
+    settings.budgetCostHiring.forEach(b => {
+      if (!allBudgetsMap[b.department]) allBudgetsMap[b.department] = {};
+      allBudgetsMap[b.department][b.year] = b.budget;
+    });
 
-    if (filterYear === 0) {
-      const budgetMap: Record<string, number> = {};
-      relevantBudgets.forEach(b => {
-        budgetMap[b.department] = (budgetMap[b.department] || 0) + b.budget;
-      });
-      relevantBudgets = Object.keys(budgetMap).map(dept => ({
-        department: dept, year: 0, budget: budgetMap[dept], actual: 0
-      }));
-    }
+    // 2. Determine Which Departments to Show
+    let targetDepts = new Set<string>();
+    
+    // Add depts with budget in target year
+    Object.keys(allBudgetsMap).forEach(dept => {
+      if (filterYear === 0 || allBudgetsMap[dept][filterYear]) {
+        targetDepts.add(dept);
+      }
+    });
 
-    const uniqueDepts = Array.from(new Set(relevantBudgets.map(b => b.department))).sort();
+    // Add depts with hires in target year (even if no budget defined)
+    candidates.filter(c => c.tahapProses === 'hired' && c.tanggalHired).forEach(c => {
+      const hireYear = new Date(c.tanggalHired).getFullYear();
+      if (filterYear === 0 || hireYear === filterYear) {
+        const dept = getDepartmentFromPosition(c.posisiDilamar);
+        targetDepts.add(dept);
+      }
+    });
 
+    const uniqueDepts = Array.from(targetDepts).sort();
+
+    // 3. Calculate Data Per Department with FALLBACK LOGIC
     const costData = uniqueDepts.map(dept => {
-      const budgetEntry = relevantBudgets.find(b => b.department === dept);
-      const budget = budgetEntry ? budgetEntry.budget : 0;
+      let budget = 0;
+      let budgetSourceYear = filterYear;
+      let isUsingPrevYear = false;
+      let hasNoBudget = false;
 
+      if (filterYear !== 0) {
+        // Case: Specific Year Selected (e.g., 2026)
+        if (allBudgetsMap[dept] && allBudgetsMap[dept][filterYear]) {
+          // Budget exists for this year
+          budget = allBudgetsMap[dept][filterYear];
+        } else {
+          // Budget MISSING for this year. Check Previous Year (2025)
+          const prevYear = filterYear - 1;
+          if (allBudgetsMap[dept] && allBudgetsMap[dept][prevYear]) {
+            budget = allBudgetsMap[dept][prevYear];
+            budgetSourceYear = prevYear;
+            isUsingPrevYear = true;
+          } else {
+            hasNoBudget = true;
+          }
+        }
+      } else {
+        // Case: All Years Selected -> Sum all budgets for this dept
+        if (allBudgetsMap[dept]) {
+          budget = Object.values(allBudgetsMap[dept]).reduce((a, b) => a + b, 0);
+        }
+      }
+
+      // Calculate Actual Spending using Smart Mapping
       // Candidates are ALREADY filtered by DashboardView based on global filters
-      // So we just match department name here using the helper
       const actual = candidates
         .filter(c => 
           c.tahapProses === 'hired' &&
@@ -93,9 +131,15 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
         .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
 
       return {
-        department: dept, budget, actual,
+        department: dept, 
+        budget, 
+        actual,
         remaining: budget - actual,
-        status: actual > budget ? 'OVER' : 'SAFE'
+        status: actual > budget ? 'OVER' : 'SAFE',
+        // Metadata for UI Indicators
+        budgetSourceYear,
+        isUsingPrevYear,
+        hasNoBudget: hasNoBudget && actual > 0
       };
     });
 
@@ -104,7 +148,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 
   const { depts: departments, costData } = getChartData();
 
-  // Chart 1: Lowongan vs Hired per Departemen
+  // Chart 1: Lowongan vs Hired per Departemen (Using Smart Mapping)
   const jobVsHiredData = departments.map(dept => {
     const openJobs = jobs.filter(j =>
       j.department.toLowerCase() === dept.toLowerCase() && j.status === 'Aktif'
@@ -207,101 +251,144 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       
       {/* CHART 1: Lowongan vs Hired */}
-       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-         <div className="flex items-center justify-between mb-4">
-           <div>
-             <h3 className="font-bold text-slate-800 text-sm sm:text-base">Lowongan vs Hired per Departemen</h3>
-             <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan posisi dibuka dan kandidat yang berhasil direkrut</p>
-           </div>
-           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
+      <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm sm:text-base">Lowongan vs Hired per Departemen</h3>
+            <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan posisi dibuka dan kandidat yang berhasil direkrut</p>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
             ✓ {filterYear === 0 ? 'Semua Tahun' : filterYear}
-           </span>
-         </div>
-         <div className="h-[250px] flex items-end justify-around gap-2 pt-4 pb-2 overflow-x-auto">
+          </span>
+        </div>
+        <div className="h-[250px] flex items-end justify-around gap-2 pt-4 pb-2 overflow-x-auto">
           {jobVsHiredData.length > 0 ? jobVsHiredData.map((item, idx) => (
-             <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[40px] group">
-               <div className="flex items-end gap-1 h-[200px] w-full justify-center relative">
-                 <div className="w-3 sm:w-4 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" style={{ height: `${(item.open / maxJobVal) * 100}%` }} title={`Lowongan: ${item.open}`}> </div>
-                 <div className="w-3 sm:w-4 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" style={{ height: `${(item.hired / maxJobVal) * 100}%` }} title={`Hired: ${item.hired}`}> </div>
-               </div>
-               <div className="text-center mt-2">
-                 <span className="text-[10px] font-semibold text-slate-600 block truncate max-w-[60px]" title={item.department}>{item.department}</span>
-                 <span className="text-[9px] text-slate-400">{item.open}/{item.hired}</span>
-               </div>
-             </div>
+            <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[40px] group">
+              <div className="flex items-end gap-1 h-[200px] w-full justify-center relative">
+                <div 
+                  className="w-3 sm:w-4 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" 
+                  style={{ height: `${(item.open / maxJobVal) * 100}%` }} 
+                  title={`Lowongan: ${item.open}`}
+                ></div>
+                <div 
+                  className="w-3 sm:w-4 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" 
+                  style={{ height: `${(item.hired / maxJobVal) * 100}%` }} 
+                  title={`Hired: ${item.hired}`}
+                ></div>
+              </div>
+              <div className="text-center mt-2">
+                <span className="text-[10px] font-semibold text-slate-600 block truncate max-w-[60px]" title={item.department}>
+                  {item.department}
+                </span>
+                <span className="text-[9px] text-slate-400">{item.open}/{item.hired}</span>
+              </div>
+            </div>
           )) : (
-             <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data departemen untuk periode ini.</div>
+            <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data departemen untuk periode ini.</div>
           )}
-         </div>
-       </div>
+        </div>
+      </div>
 
-      {/* CHART 2: Cost Hiring per Departemen */}
-       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-         <div className="flex items-center justify-between mb-4">
-           <div>
-             <h3 className="font-bold text-slate-800 text-sm sm:text-base">Cost Hiring per Departemen</h3>
-             <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan budget alokasi vs pengeluaran riil</p>
-           </div>
-           <div className="flex items-center gap-2 text-[10px] font-bold">
-             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> Budget</span>
-             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Aktual</span>
-           </div>
-         </div>
-         <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+      {/* CHART 2: Cost Hiring per Departemen - WITH FALLBACK INDICATOR */}
+      <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm sm:text-base">Cost Hiring per Departemen</h3>
+            <p className="text-slate-400 text-[11px] sm:text-xs">Perbandingan budget alokasi vs pengeluaran riil</p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-bold">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> Budget</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Aktual</span>
+          </div>
+        </div>
+        <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
           {costData.length > 0 ? costData.map((item, idx) => (
-             <div key={idx} className="space-y-1">
-               <div className="flex justify-between text-xs font-semibold">
-                 <span className="text-slate-700 truncate max-w-[120px]" title={item.department}>{item.department}</span>
-                 <div className="flex items-center gap-2">
-                   <span className="text-slate-500">Real: <b className={item.status === 'OVER' ? 'text-rose-600' : 'text-emerald-600'}>{formatIDR(item.actual)}</b></span>
-                   <span className="text-slate-400">|</span>
-                   <span className="text-slate-500">Budg: <b>{formatIDR(item.budget)}</b></span>
-                 </div>
-               </div>
-               <div className="w-full flex items-center gap-1 h-3">
-                 <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden relative">
-                   <div className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full" style={{ width: `${(item.budget / maxCostVal) * 100}%` }}> </div>
-                   <div className={`absolute top-0 left-0 h-full rounded-full opacity-80 ${item.status === 'OVER' ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${(item.actual / maxCostVal) * 100}%` }}> </div>
-                 </div>
-               </div>
-               <div className="text-right">
-                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${item.status === 'OVER' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {item.status === 'OVER' ? '⚠ Over Budget' : '✅ On Budget'}
-                 </span>
-               </div>
-             </div>
+            <div key={idx} className="space-y-1 p-2 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
+              <div className="flex justify-between items-start text-xs font-semibold">
+                <div className="flex flex-col">
+                  <span className="text-slate-700 truncate max-w-[120px]" title={item.department}>{item.department}</span>
+                  
+                  {/* BADGE: Shows if using previous year budget */}
+                  {item.isUsingPrevYear && (
+                    <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1 w-fit border border-amber-100">
+                      ⚠ Menggunakan Budget {item.budgetSourceYear}
+                    </span>
+                  )}
+                  
+                  {/* BADGE: Shows if no budget exists */}
+                  {item.hasNoBudget && (
+                    <span className="text-[9px] text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded mt-1 w-fit border border-rose-100">
+                      ❌ Tidak Ada Budget Aktif
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Real: <b className={item.status === 'OVER' ? 'text-rose-600' : 'text-emerald-600'}>{formatIDR(item.actual)}</b></span>
+                    <span className="text-slate-400">|</span>
+                    <span className="text-slate-500">Budg: <b>{formatIDR(item.budget)}</b></span>
+                  </div>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${item.status === 'OVER' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                    {item.status === 'OVER' ? '⚠ Over Budget' : '✅ On Budget'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Visual Bar */}
+              <div className="w-full flex items-center gap-1 h-3 mt-1">
+                <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden relative">
+                  <div 
+                    className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full" 
+                    style={{ width: `${(item.budget / maxCostVal) * 100}%` }}
+                  ></div>
+                  <div 
+                    className={`absolute top-0 left-0 h-full rounded-full opacity-80 ${item.status === 'OVER' ? 'bg-rose-500' : 'bg-emerald-500'}`} 
+                    style={{ width: `${(item.actual / maxCostVal) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
           )) : (
-             <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data budget untuk periode ini.</div>
+            <div className="w-full text-center text-slate-400 text-xs py-10">Tidak ada data budget untuk periode ini.</div>
           )}
-         </div>
-       </div>
+        </div>
+      </div>
 
       {/* CHART 3: Tren Lowongan vs Rekrutmen */}
-       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm lg:col-span-2">
-         <div className="flex items-center justify-between mb-4">
-           <div>
-             <h3 className="font-bold text-slate-800 text-sm sm:text-base">Tren Lowongan vs Rekrutmen</h3>
-             <p className="text-slate-400 text-[11px] sm:text-xs">{getTrendSubtitle()}</p>
-           </div>
-           <div className="flex items-center gap-2 text-[10px] font-bold">
-             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> Lowongan Baru</span>
-             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Kandidat Hired</span>
-           </div>
-         </div>
-         <div className="h-[200px] flex items-end justify-around gap-2 pt-4 pb-2 overflow-x-auto">
+      <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm lg:col-span-2">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm sm:text-base">Tren Lowongan vs Rekrutmen</h3>
+            <p className="text-slate-400 text-[11px] sm:text-xs">{getTrendSubtitle()}</p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-bold">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> Lowongan Baru</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Kandidat Hired</span>
+          </div>
+        </div>
+        <div className="h-[200px] flex items-end justify-around gap-2 pt-4 pb-2 overflow-x-auto">
           {trendData.map((item, idx) => (
-             <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[30px] group">
-               <div className="flex items-end gap-1 h-[150px] w-full justify-center relative">
-                 <div className="w-2 sm:w-3 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" style={{ height: `${(item.jobs / maxTrendVal) * 100}%` }} title={`Lowongan: ${item.jobs}`}> </div>
-                 <div className="w-2 sm:w-3 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" style={{ height: `${(item.hires / maxTrendVal) * 100}%` }} title={`Hired: ${item.hires}`}> </div>
-               </div>
-               <span className="text-[9px] font-semibold text-slate-600">{item.label}</span>
-               <span className="text-[8px] text-slate-400">L{item.jobs} H{item.hires}</span>
-             </div>
+            <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[30px] group">
+              <div className="flex items-end gap-1 h-[150px] w-full justify-center relative">
+                <div 
+                  className="w-2 sm:w-3 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600" 
+                  style={{ height: `${(item.jobs / maxTrendVal) * 100}%` }} 
+                  title={`Lowongan: ${item.jobs}`}
+                ></div>
+                <div 
+                  className="w-2 sm:w-3 bg-emerald-500 rounded-t-sm transition-all duration-500 hover:bg-emerald-600" 
+                  style={{ height: `${(item.hires / maxTrendVal) * 100}%` }} 
+                  title={`Hired: ${item.hires}`}
+                ></div>
+              </div>
+              <span className="text-[9px] font-semibold text-slate-600">{item.label}</span>
+              <span className="text-[8px] text-slate-400">L{item.jobs} H{item.hires}</span>
+            </div>
           ))}
-         </div>
-       </div>
+        </div>
+      </div>
 
-     </div>
+    </div>
   );
 };
