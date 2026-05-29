@@ -23,18 +23,17 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     if (!settings.budgetCostHiring) return { depts: [], costData: [] };
     
     // 1. Filter budget sesuai tahun global dashboard
-    // Jika filterYear 0 (Semua Tahun), ambil semua. Jika spesifik, ambil hanya tahun itu.
+    // Note: Budget settings TIDAK difilter oleh DashboardView, jadi kita filter di sini berdasarkan filterYear
     let relevantBudgets = settings.budgetCostHiring.filter(b => 
       filterYear === 0 ? true : b.year === filterYear
     );
 
-    // 2. Jika "Semua Tahun", kita perlu mengelompokkan dan menjumlahkan budget per departemen
+    // 2. Jika "Semua Tahun", agregasi budget
     if (filterYear === 0) {
       const budgetMap: Record<string, number> = {};
       relevantBudgets.forEach(b => {
         budgetMap[b.department] = (budgetMap[b.department] || 0) + b.budget;
       });
-      
       relevantBudgets = Object.keys(budgetMap).map(dept => ({
         department: dept,
         year: 0,
@@ -43,10 +42,9 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       }));
     }
 
-    // 3. Ambil nama departemen unik
     const uniqueDepts = Array.from(new Set(relevantBudgets.map(b => b.department))).sort();
 
-    // 4. Hitung Cost Hiring Data (Actual)
+    // 3. Hitung Cost Hiring Data (Actual)
     // PENTING: 'candidates' prop di sini ADALAH data yang sudah difilter oleh DashboardView
     // berdasarkan Year, Quarter, dan Range. Jadi kita TIDAK PERLU filter tanggal lagi di sini.
     // Kita hanya perlu mempastikannya berstatus 'hired' dan cocok dengan departemen.
@@ -81,16 +79,11 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
   // --- CHART 1: Lowongan vs Hired per Departemen ---
   // Menggunakan data 'jobs' dan 'candidates' yang SUDAH DIFILTER oleh DashboardView
   const jobVsHiredData = departments.map(dept => {
-    // Count Active Jobs for this dept
-    // Karena jobs sudah difilter by date/range di parent, kita hitung semua yang status 'Aktif'
     const openJobs = jobs.filter(j => 
       j.department.toLowerCase() === dept.toLowerCase() && 
       j.status === 'Aktif'
     ).length;
 
-    // Count Hired Candidates for this dept
-    // Karena candidates sudah difilter by date/range/year/quarter di parent,
-    // kita cukup hitung yang status 'hired' dan cocok departemennya.
     const hiredCands = candidates.filter(c => 
       c.tahapProses === 'hired' &&
       (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
@@ -100,13 +93,14 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     return { department: dept, open: openJobs, hired: hiredCands };
   });
 
-  // --- CHART 3: Tren Lowongan vs Rekrutmen (Dynamic based on Filter) ---
+  // --- CHART 3: Tren Lowongan vs Rekrutmen (FIXED FOR QUARTERS) ---
   const nowDate = new Date();
   let trendMonths: { month: string; monthNum: number; year: number }[] = [];
 
-  // Logika Dinamis Berdasarkan Filter Quarter & Year
+  // Logic Dinamis Berdasarkan Filter Quarter & Year
   if (filterQuarters.length > 0) {
     // Jika Quarter dipilih, tampilkan bulan-bulan dalam quarter tersebut pada Tahun yang dipilih
+    // Urutkan quarter agar grafik rapi (Q1 -> Q2 -> Q3 -> Q4)
     const sortedQuarters = [...filterQuarters].sort((a, b) => a - b);
     const targetYear = filterYear === 0 ? nowDate.getFullYear() : filterYear;
     
@@ -139,7 +133,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       trendMonths.push({
         month: d.toLocaleString('id-ID', { month: 'short', year: '2-digit' }),
         monthNum: d.getMonth(),
-        year: d.getFullYear()
+        year: d.getFullYear
       });
     }
   }
