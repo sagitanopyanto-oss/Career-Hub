@@ -92,6 +92,7 @@ export interface AdminRolePermissions {
 export interface AdminRole {
   id: string;
   roleName: string;
+  email: string; // 🔹 BARU: Email pengirim untuk role ini
   accessLevel: 'Super Admin' | 'HR Manager' | 'Recruiter' | 'Interviewer' | 'Viewer';
   status: 'Active' | 'Inactive';
   description: string;
