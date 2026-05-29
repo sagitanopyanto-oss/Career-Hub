@@ -327,44 +327,149 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Aggregate Cost Hiring Chart */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring: Total Budget vs Actual
-            </h3>
-            <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5">
-              Ringkasan total alokasi budget seluruh departemen vs realisasi pengeluaran
-              {filterYear !== 0 && <span className="font-bold text-indigo-600"> (Tahun {filterYear})</span>}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-[10px] font-bold">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600"></span> Budget</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Actual</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <span className="text-xs text-slate-500 font-bold uppercase">Total Budget</span>
-            <div className="text-xl font-extrabold text-slate-800 mt-1">{formatIDR(totalBudget)}</div>
-          </div>
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <span className="text-xs text-slate-500 font-bold uppercase">Total Actual</span>
-            <div className="text-xl font-extrabold text-slate-800 mt-1">{formatIDR(totalActual)}</div>
-          </div>
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <span className="text-xs text-slate-500 font-bold uppercase">Variance</span>
-            <div className="text-xl font-extrabold mt-1">
-              {totalActual > totalBudget ? (
-                <span className="text-rose-600">Over Budget</span>
-              ) : (
-                <span className="text-emerald-600">On Budget</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+  {/* 🔹 REVISED: AGGREGATE COST HIRING CHART - VISUAL BAR CHART WITH TOOLTIP */}
+   <div className= "bg-white rounded-xl border border-slate-100 shadow-sm p-5 " >
+     <div className= "flex items-center justify-between mb-6 " >
+       <div >
+         <h3 className= "font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2 " >
+           <DollarSign className= "w-4 h-4 text-indigo-600 " / > Cost Hiring: Total Budget vs Actual
+         </h3 >
+         <p className= "text-slate-400 text-[11px] sm:text-xs mt-0.5 " >
+          Perbandingan total alokasi budget vs realisasi pengeluaran per tahun
+          {filterYear !== 0  & &  <span className= "font-bold text-indigo-600 " > (Tahun {filterYear}) </span >}
+         </p >
+       </div >
+       <div className= "flex items-center gap-2 text-[10px] font-bold " >
+         <span className= "flex items-center gap-1 " > <span className= "w-2 h-2 rounded-full bg-indigo-600 " > </span > Budget </span >
+         <span className= "flex items-center gap-1 " > <span className= "w-2 h-2 rounded-full bg-emerald-500 " > </span > Actual </span >
+       </div >
+     </div >
+
+    {/* Prepare yearly aggregated data for chart */}
+     {(() => {
+      // Aggregate budget and actual by year
+      const budgetByYear = safeBudgets.reduce((acc, b) => {
+        acc[b.year] = (acc[b.year] || 0) + b.budget;
+        return acc;
+      }, {} as Record<number, number>);
+
+      const actualByYear = displayCandidates
+        .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
+        .reduce((acc, c) => {
+          const y = new Date(c.tanggalHired).getFullYear();
+          acc[y] = (acc[y] || 0) + (c.expectedSalary || 0);
+          return acc;
+        }, {} as Record<number, number>);
+
+      // Get unique years from both datasets
+      const allYearsSet = new Set([...Object.keys(budgetByYear), ...Object.keys(actualByYear)].map(Number));
+      let chartYears = Array.from(allYearsSet).sort((a, b) => a - b);
+
+      // If filterYear is set, show only that year
+      if (filterYear !== 0) {
+        chartYears = chartYears.filter(y => y === filterYear);
+      }
+
+      // Build chart data array
+      const chartData = chartYears.map(year => ({
+        year,
+        budget: budgetByYear[year] || 0,
+        actual: actualByYear[year] || 0
+      }));
+
+      const maxVal = Math.max(...chartData.flatMap(d => [d.budget, d.actual]), 1);
+
+      return chartData.length > 0 ? (
+         <div className= "relative h-64 w-full border-b border-l border-slate-200 pl-10 pb-2 " >
+          
+          {/* Y-Axis Labels */}
+           <div className= "absolute inset-0 flex flex-col justify-between pointer-events-none pr-2 " >
+            {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
+              const val = maxVal * ratio;
+              return (
+                 <div key={ratio} className= "border-t border-dashed border-slate-100 w-full h-0 relative flex items-center " >
+                   <span className= "absolute -left-10 text-[9px] text-slate-400 font-medium w-8 text-right pr-2 " >
+                    {val >= 1000000 ? `${(val / 1000000).toFixed(0)}jt` : val.toLocaleString('id-ID')}
+                   </span >
+                 </div >
+              );
+            })}
+           </div >
+
+          {/* Bars Container */}
+           <div className= "absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2 " >
+            {chartData.map((item) => {
+              const budgetHeight = (item.budget / maxVal) * 100;
+              const actualHeight = (item.actual / maxVal) * 100;
+              const isOver = item.actual > item.budget && item.budget > 0;
+              const variance = item.budget > 0 ? ((item.actual - item.budget) / item.budget * 100).toFixed(1) : null;
+
+              return (
+                 <div key={item.year} className= "flex flex-col items-center gap-2 group relative flex-1 max-w-[80px] " >
+                  
+                  {/* Tooltip on Hover */}
+                   <div className= "absolute -top-28 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px] " >
+                     <div className= "font-bold mb-2 text-xs border-b border-slate-600 pb-1 " >Tahun {item.year} </div >
+                     <div className= "grid grid-cols-2 gap-x-4 gap-y-1 " >
+                       <span className= "text-slate-300 " >Budget: </span >  <span className= "text-right font-semibold " >{formatIDR(item.budget)} </span >
+                       <span className= "text-slate-300 " >Actual: </span >  <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`} >{formatIDR(item.actual)} </span >
+                       <span className= "text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1 " >Variance: </span > 
+                       <span className={`col-span-2 text-right font-bold ${variance && Number(variance) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`} >
+                        {variance !== null ? `${Number(variance) >= 0 ? '+' : ''}${variance}%` : '-'}
+                       </span >
+                     </div >
+                   </div >
+
+                  {/* The Bars */}
+                   <div className= "flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1 " >
+                    {/* Budget Bar */}
+                     <div className= "relative flex flex-col items-center justify-end h-full w-1/2 group/bar " >
+                       <div
+                        className= "w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative "
+                        style={{ height: `${Math.max(budgetHeight, 2)}%` }} // Min 2% height if exists
+                       >
+                         {/* Value Label on Top of Bar */}
+                         {item.budget > 0 && (
+                            <span className= "absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap " >
+                             {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
+                            </span >
+                         )}
+                       </div >
+                     </div >
+
+                    {/* Actual Bar */}
+                     <div className= "relative flex flex-col items-center justify-end h-full w-1/2 group/act " >
+                       <div
+                        className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
+                        style={{ height: `${Math.max(actualHeight, 2)}%` }}
+                       >
+                         {/* Value Label on Top of Bar */}
+                         {item.actual > 0 && (
+                            <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`} >
+                             {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
+                            </span >
+                         )}
+                       </div >
+                     </div >
+                   </div >
+
+                  {/* X-Axis Label */}
+                   <div className= "text-center mt-2 " >
+                     <span className= "text-xs font-bold text-slate-600 block " >{item.year} </span >
+                   </div >
+                 </div >
+              );
+            })}
+           </div >
+         </div >
+      ) : (
+         <div className= "h-40 flex flex-col items-center justify-center text-slate-400 gap-2 " >
+           <DollarSign className= "w-8 h-8 opacity-30 " / >
+           <p className= "text-sm font-medium " >Tidak ada data cost hiring untuk periode yang dipilih. </p >
+         </div >
+      );
+     })()}
+   </div >
 
       {/* Recruitment Visualizations */}
       <RecruitmentCharts
