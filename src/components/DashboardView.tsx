@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Users, Briefcase, UserCheck, Stethoscope, FileCheck, Activity,
   CalendarClock, Clock, ArrowUpRight, TrendingUp, Award, CheckCircle,
-  DollarSign, AlertTriangle, X
+  DollarSign, AlertTriangle
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 import { RecruitmentCharts } from './RecruitmentCharts';
@@ -21,14 +21,18 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  candidates, jobs, settings,
-  filterRange, setFilterRange,
-  filterYear, setFilterYear,
-  filterQuarters, setFilterQuarters,
+  candidates,
+  jobs,
+  settings,
+  filterRange,
+  setFilterRange,
+  filterYear,
+  setFilterYear,
+  filterQuarters,
+  setFilterQuarters,
   setActiveMenu
 }) => {
   const nowDate = new Date();
-  const [selectedDetailYear, setSelectedDetailYear] = useState<number | null>(null);
 
   // Safe Data Handling
   const safeCandidates = candidates || [];
@@ -42,6 +46,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ...safeJobs.map(j => j.createdAt ? new Date(j.createdAt).getFullYear() : null),
     nowDate.getFullYear()
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
+
+  // 🔹 NEW: Multi-year selection (UI only, sync with filterYear)
+  const [selectedYears, setSelectedYears] = useState<number[]>(filterYear === 0 ? [] : [filterYear]);
+
+  useEffect(() => {
+    if (filterYear === 0) {
+      setSelectedYears([]);
+    } else if (!selectedYears.includes(filterYear)) {
+      setSelectedYears([filterYear]);
+    }
+  }, [filterYear]);
+
+  const handleYearToggle = (year: number) => {
+    const newSelected = selectedYears.includes(year)
+      ? selectedYears.filter(y => y !== year)
+      : [...selectedYears, year];
+    setSelectedYears(newSelected);
+    // Sync to filterYear: jika 1 tahun → set, jika >1 atau 0 → set 0 (all years)
+    if (newSelected.length === 1) {
+      setFilterYear(newSelected[0]);
+    } else {
+      setFilterYear(0);
+    }
+  };
 
   const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
   const diffInDays = (d1: string, d2: string) => {
@@ -67,12 +95,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (isNaN(date.getTime())) return false;
     if (filterQuarters.length > 0) return isWithinYearAndQuarter(dateStr);
     if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
+
     if (filterRange === 'month') {
       return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
     } else if (filterRange === '6months') {
       const sixMonthsAgo = new Date(nowDate);
       sixMonthsAgo.setMonth(nowDate.getMonth() - 6);
-      return date >= sixMonthsAgo && date <= nowDate;
+      return date >= sixMonthsAgo;
     }
     return true;
   };
@@ -112,6 +141,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     displayCandidates.forEach(c => {
       const startVal = (c as any)[stg.startKey];
       const endVal = (c as any)[stg.endKey];
+
       if (startVal && !isNaN(new Date(startVal).getTime())) {
         candidateCount++;
         if (endVal && !isNaN(new Date(endVal).getTime())) {
@@ -123,12 +153,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }
       }
     });
+
     const rate = candidateCount > 0 ? Math.round((compliantCount / candidateCount) * 100) : 0;
     totalCompliant += compliantCount;
     totalViolation += violationCount;
+
     let status: 'OPTIMAL' | 'WARNING' | 'CRITICAL' = 'OPTIMAL';
     if (rate < 50) status = 'CRITICAL';
     else if (rate < 80) status = 'WARNING';
+
     return { stage: stg.label, targetDays, candidates: candidateCount, compliant: compliantCount, violation: violationCount, rate, status };
   });
 
@@ -145,40 +178,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const avgTargetSla = safeSettings.targetSlaDays.reduce((sum, s) => sum + s.targetDays, 0) / (safeSettings.targetSlaDays.length || 1);
   const slaGoalPercent = safeSettings.targetSlaManagement ?? 85;
 
-  const recentApplicants = [...displayCandidates]
+  const recentApplicants: Candidate[] = [...displayCandidates]
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
     .slice(0, 5);
 
-  // --- AGGREGATE COST HIRING CHART DATA & VISUALIZATION ---
-  const costHiringAggData = useMemo(() => {
-    const budgetByYear = safeBudgets.reduce((acc, b) => {
-      acc[b.year] = (acc[b.year] || 0) + b.budget;
-      return acc;
-    }, {} as Record<number, number>);
+  // --- AGGREGATE COST HIRING CHART DATA ---
+  const totalBudget = safeBudgets
+    .filter(b => filterYear === 0 ? true : b.year === filterYear)
+    .reduce((sum, b) => sum + b.budget, 0);
 
-    const actualByYear = displayCandidates
-      .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
-      .reduce((acc, c) => {
-        const y = new Date(c.tanggalHired).getFullYear();
-        acc[y] = (acc[y] || 0) + (c.expectedSalary || 0);
-        return acc;
-      }, {} as Record<number, number>);
+  const totalActual = displayCandidates
+    .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
+    .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
 
-    const allYearsSet = new Set([...Object.keys(budgetByYear), ...Object.keys(actualByYear)].map(Number));
-    let chartYears = Array.from(allYearsSet).sort((a, b) => a - b);
-
-    if (filterYear !== 0) {
-      chartYears = chartYears.filter(y => y === filterYear);
-    }
-
-    return chartYears.map(year => ({
-      year,
-      budget: budgetByYear[year] || 0,
-      actual: actualByYear[year] || 0
-    }));
-  }, [safeBudgets, displayCandidates, filterYear]);
-
-  const maxAggVal = Math.max(...costHiringAggData.flatMap(d => [d.budget, d.actual]), 1);
   const formatIDR = (val: number) => {
     if (val >= 1000000000) return `Rp ${(val / 1000000000).toFixed(1)} M`;
     if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1)} Jt`;
@@ -198,43 +210,106 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ];
   const maxPipelineVal = Math.max(...pipelineData.map(p => p.count), 1);
 
+  // --- NEW: Cost Hiring per Department (for vertical bar chart) ---
+  const costHiringPerDept = useMemo(() => {
+    if (!safeSettings.budgetCostHiring) return [];
+
+    // Aggregate budget per department (with year filter)
+    const budgetMap: Record<string, number> = {};
+    safeSettings.budgetCostHiring
+      .filter(b => filterYear === 0 || b.year === filterYear)
+      .forEach(b => {
+        budgetMap[b.department] = (budgetMap[b.department] || 0) + b.budget;
+      });
+
+    // Calculate actual per department (only hired candidates, matched by position → dept)
+    const actualMap: Record<string, number> = {};
+    displayCandidates
+      .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
+      .forEach(c => {
+        // Simple mapping: use department from job or fallback to position keyword
+        const dept = safeJobs.find(j => j.judul === c.posisiDilamar)?.department || c.posisiDilamar;
+        actualMap[dept] = (actualMap[dept] || 0) + (c.expectedSalary || 0);
+      });
+
+    return Object.keys(budgetMap).map(dept => ({
+      department: dept,
+      budget: budgetMap[dept] || 0,
+      actual: actualMap[dept] || 0,
+      status: (actualMap[dept] || 0) > (budgetMap[dept] || 0) ? 'OVER' : 'SAFE'
+    }));
+  }, [safeSettings.budgetCostHiring, displayCandidates, filterYear]);
+
+  const maxCostVal = Math.max(...costHiringPerDept.map(d => Math.max(d.budget, d.actual)), 1);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-white min-h-screen">
       {/* Header Filters */}
       <div className="bg-slate-900 text-white p-4 sm:p-6 rounded-2xl shadow-md space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang Kembali, Team Rekrutmen!</h2>
-            <p className="text-slate-400 text-xs md:text-sm mt-1">Analisis performa, SLA rekrutmen, dan funnel pelamar secara real-time.</p>
+            <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight">
+              Selamat Datang Kembali, Team Rekrutmen!
+            </h2>
+            <p className="text-slate-400 text-xs md:text-sm mt-1">
+              Analisis performa, SLA rekrutmen, dan funnel pelamar secara real-time.
+            </p>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 self-start lg:self-auto bg-slate-800 p-1.5 rounded-lg border border-slate-700 overflow-x-auto shrink-0">
-            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold px-2 whitespace-nowrap">Periode:</span>
-            {(['month', '6months', 'annual'] as const).map((range) => (
+            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold px-2 whitespace-nowrap">
+              Periode:
+            </span>
+            {(['month', '6months', 'annual'] as const).map(range => (
               <button
                 key={range}
                 onClick={() => { setFilterRange(range); setFilterQuarters([]); }}
-                className={`px-2 sm:px-3 py-1.5 rounded text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap ${filterRange === range && filterQuarters.length === 0 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                className={`px-2 sm:px-3 py-1.5 rounded text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap ${
+                  filterRange === range && filterQuarters.length === 0
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
               >
                 {range === 'month' ? 'Bulan Ini' : range === '6months' ? '6 Bulan' : 'Tahunan'}
               </button>
             ))}
           </div>
         </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800">
           <div className="flex items-center gap-2.5 shrink-0">
-            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Tahun:</span>
-            <select
-              value={filterYear}
-              onChange={(e) => { setFilterYear(Number(e.target.value)); setFilterQuarters([]); }}
-              className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
-            >
-              <option value={0}>Semua Tahun</option>
-              {allYears.map(y => (<option key={y} value={y}>{y}</option>))}
-            </select>
+            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">
+              Tahun:
+            </span>
+            {/* 🔹 MULTI-CHECKBOX YEAR FILTER */}
+            <div className="relative">
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
+              >
+                {selectedYears.length === 0 ? 'Semua Tahun' : selectedYears.length === 1 ? `${selectedYears[0]}` : `${selectedYears.length} Tahun`}
+              </button>
+              <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 z-10 overflow-hidden">
+                {allYears.map(year => (
+                  <label key={year} className="flex items-center px-3 py-2 hover:bg-slate-100 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedYears.includes(year)}
+                      onChange={() => handleYearToggle(year)}
+                      className="mr-2 h-4 w-4 text-indigo-600 rounded"
+                    />
+                    <span>{year}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
+
           <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
+
           <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Kuartal:</span>
+            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">
+              Kuartal:
+            </span>
             {[
               { q: 1, label: 'Q1', desc: 'Jan–Mar' },
               { q: 2, label: 'Q2', desc: 'Apr–Jun' },
@@ -247,27 +322,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   key={q}
                   onClick={() => toggleQuarter(q)}
                   title={desc}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] sm:text-xs font-bold transition-all ${isActive ? 'bg-indigo-600 border-indigo-500 text-white shadow-md' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] sm:text-xs font-bold transition-all ${
+                    isActive
+                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'
+                  }`}
                 >
-                  <span className={`w-3.5 h-3.5 flex items-center justify-center rounded border text-[8px] font-black shrink-0 ${isActive ? 'bg-white/20 border-white/40 text-white' : 'border-slate-600'}`}>
+                  <span className={`w-3.5 h-3.5 flex items-center justify-center rounded border text-[8px] font-black shrink-0 ${
+                    isActive ? 'bg-white/20 border-white/40 text-white' : 'border-slate-600'
+                  }`}>
                     {isActive ? '✓' : ''}
                   </span>
                   {label}
-                  <span className={`hidden sm:inline text-[9px] font-medium ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>{desc}</span>
+                  <span className={`hidden sm:inline text-[9px] font-medium ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    {desc}
+                  </span>
                 </button>
               );
             })}
             {filterQuarters.length > 0 && (
-              <button onClick={() => setFilterQuarters([])} className="text-[10px] text-slate-500 hover:text-rose-400 font-bold transition-colors underline underline-offset-2">Reset Q</button>
+              <button
+                onClick={() => setFilterQuarters([])}
+                className="text-[10px] text-slate-500 hover:text-rose-400 font-bold transition-colors underline underline-offset-2"
+              >
+                Reset Q
+              </button>
             )}
           </div>
+
           {(filterYear !== 0 || filterQuarters.length > 0) && (
             <div className="flex items-center gap-1.5 ml-auto">
               <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" />
-                {filterYear !== 0 ? `${filterYear}` : ''}{filterQuarters.length > 0 ? ` · ${filterQuarters.map(q => `Q${q}`).join(', ')}` : ''}
+                {filterYear !== 0 ? `${filterYear}` : ''}
+                {filterQuarters.length > 0 && ` · ${filterQuarters.map(q => `Q${q}`).join(', ')}`}
               </span>
-              <button onClick={() => { setFilterYear(nowDate.getFullYear()); setFilterQuarters([]); }} className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2">Reset</button>
+              <button
+                onClick={() => {
+                  setFilterYear(nowDate.getFullYear());
+                  setFilterQuarters([]);
+                  setSelectedYears([]);
+                }}
+                className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2"
+              >
+                Reset
+              </button>
             </div>
           )}
         </div>
@@ -287,8 +386,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           return (
             <div key={idx} className={`p-3 sm:p-4 bg-white rounded-xl border flex items-center justify-between gap-2 shadow-sm hover:shadow transition-shadow ${card.color}`}>
               <div className="min-w-0">
-                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block truncate">{card.title}</span>
-                <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight block mt-1">{card.count}</span>
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block truncate">
+                  {card.title}
+                </span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight block mt-1">
+                  {card.count}
+                </span>
               </div>
               <div className="p-2 sm:p-3 rounded-lg bg-white shadow-sm border border-slate-100 shrink-0">
                 <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -301,7 +404,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 3 SLA Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
-          <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 text-emerald-600 shrink-0"><Activity className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
+            <Activity className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
           <div className="min-w-0">
             <span className="text-xs font-semibold text-slate-400 block">SLA Compliant Rate</span>
             <div className="flex items-baseline gap-2 mt-1">
@@ -311,7 +416,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
-          <div className="p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 shrink-0"><Clock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+            <Clock className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
           <div className="min-w-0">
             <span className="text-xs font-semibold text-slate-400 block">Rata-rata Waktu Hired (SLA)</span>
             <div className="flex items-baseline gap-2 mt-1">
@@ -321,7 +428,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4 sm:col-span-2 lg:col-span-1">
-          <div className="p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 shrink-0"><CalendarClock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+          <div className="p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 shrink-0">
+            <CalendarClock className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
           <div className="min-w-0">
             <span className="text-xs font-semibold text-slate-400 block">Target SLA Terpenuhi</span>
             <div className="flex items-baseline gap-2 mt-1">
@@ -332,112 +441,69 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 🔹 REVISED: AGGREGATE COST HIRING CHART - VISUAL BAR CHART WITH TOOLTIP */}
+      {/* 🔹 NEW: Cost Hiring per Department — Vertical Bar Chart (above Tren) */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring: Total Budget vs Actual
+              <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring per Departemen
             </h3>
             <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5">
-              Perbandingan total alokasi budget vs realisasi pengeluaran per tahun
+              Perbandingan alokasi budget vs pengeluaran riil per departemen
               {filterYear !== 0 && <span className="font-bold text-indigo-600"> (Tahun {filterYear})</span>}
             </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-bold">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600"></span> Budget</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Actual</span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-indigo-600"></span> Budget
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Actual
+            </span>
           </div>
         </div>
 
-        {costHiringAggData.length > 0 ? (
-          <div className="relative h-64 w-full border-b border-l border-slate-200 pl-10 pb-2">
-            {/* Y-Axis Labels */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
-              {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
-                const val = maxAggVal * ratio;
-                return (
-                  <div key={ratio} className="border-t border-dashed border-slate-100 w-full h-0 relative flex items-center">
-                    <span className="absolute -left-10 text-[9px] text-slate-400 font-medium w-8 text-right pr-2">
-                      {val >= 1000000 ? `${(val / 1000000).toFixed(0)}jt` : val.toLocaleString('id-ID')}
+        <div className="h-[250px] flex items-end justify-around gap-2 pt-4 pb-2 overflow-x-auto">
+          {costHiringPerDept.length > 0 ? (
+            costHiringPerDept.map((item, idx) => {
+              const budgetHeight = (item.budget / maxCostVal) * 100;
+              const actualHeight = (item.actual / maxCostVal) * 100;
+              return (
+                <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[60px] group">
+                  <div className="flex flex-col items-center gap-1 h-[200px] w-full justify-center relative">
+                    {/* Budget Bar (bottom) */}
+                    <div
+                      className="w-6 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600"
+                      style={{ height: `${Math.max(budgetHeight, 2)}%` }}
+                    ></div>
+                    {/* Actual Bar (on top) */}
+                    <div
+                      className={`w-6 rounded-t-sm transition-all duration-500 ${
+                        item.status === 'OVER' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'
+                      }`}
+                      style={{ height: `${Math.max(actualHeight, 2)}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-center mt-2">
+                    <span className="text-[10px] font-semibold text-slate-600 block truncate max-w-[60px]" title={item.department}>
+                      {item.department}
+                    </span>
+                    <span className="text-[9px] text-slate-400">
+                      {formatIDR(item.actual)} / {formatIDR(item.budget)}
                     </span>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })
+          ) : (
+            <div className="w-full text-center text-slate-400 text-xs py-10">
+              Tidak ada data budget untuk periode yang dipilih.
             </div>
-
-            {/* Bars Container */}
-            <div className="absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2">
-              {costHiringAggData.map((item) => {
-                const budgetHeight = (item.budget / maxAggVal) * 100;
-                const actualHeight = (item.actual / maxAggVal) * 100;
-                const isOver = item.actual > item.budget && item.budget > 0;
-                const variance = item.budget > 0 ? ((item.actual - item.budget) / item.budget * 100).toFixed(1) : null;
-
-                return (
-                  <div key={item.year} className="flex flex-col items-center gap-2 group relative flex-1 max-w-[80px]">
-                    {/* Tooltip on Hover */}
-                    <div className="absolute -top-28 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px]">
-                      <div className="font-bold mb-2 text-xs border-b border-slate-600 pb-1">Tahun {item.year}</div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                        <span className="text-slate-300">Budget:</span> <span className="text-right font-semibold">{formatIDR(item.budget)}</span>
-                        <span className="text-slate-300">Actual:</span> <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>{formatIDR(item.actual)}</span>
-                        <span className="text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1">Variance:</span>
-                        <span className={`col-span-2 text-right font-bold ${variance && Number(variance) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                          {variance !== null ? `${Number(variance) >= 0 ? '+' : ''}${variance}%` : '-'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* The Bars */}
-                    <div className="flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1">
-                      {/* Budget Bar */}
-                      <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/bar">
-                        <div
-                          className="w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative"
-                          style={{ height: `${Math.max(budgetHeight, 2)}%` }}
-                        >
-                          {item.budget > 0 && (
-                            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap">
-                              {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Actual Bar */}
-                      <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/act">
-                        <div
-                          className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
-                          style={{ height: `${Math.max(actualHeight, 2)}%` }}
-                        >
-                          {item.actual > 0 && (
-                            <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* X-Axis Label */}
-                    <div className="text-center mt-2">
-                      <span className="text-xs font-bold text-slate-600 block">{item.year}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
-            <DollarSign className="w-8 h-8 opacity-30" />
-            <p className="text-sm font-medium">Tidak ada data cost hiring untuk periode yang dipilih.</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Recruitment Visualizations */}
+      {/* Recruitment Visualizations (now includes Tren chart) */}
       <RecruitmentCharts
         candidates={displayCandidates}
         jobs={filteredJobs}
@@ -485,7 +551,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <p className="text-slate-400 text-[11px] sm:text-xs">Evaluasi waktu proses kandidat pada masing-masing tahapan (berdasarkan filter aktif)</p>
           </div>
-          <span className="self-start sm:self-auto px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] sm:text-xs font-bold rounded-full whitespace-nowrap">Realtime SLA Tracker</span>
+          <span className="self-start sm:self-auto px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] sm:text-xs font-bold rounded-full whitespace-nowrap">
+            Realtime SLA Tracker
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[820px]">
@@ -545,7 +613,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <p className="text-slate-400 text-[11px] sm:text-xs">Kandidat yang baru saja mensubmit aplikasi lamaran (berdasarkan filter aktif)</p>
           </div>
-          <button onClick={() => setActiveMenu('candidates')} className="self-start sm:self-auto text-[11px] sm:text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 whitespace-nowrap">
+          <button
+            onClick={() => setActiveMenu('candidates')}
+            className="self-start sm:self-auto text-[11px] sm:text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 whitespace-nowrap"
+          >
             Lihat Database Kandidat <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
@@ -565,12 +636,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {recentApplicants.map((cand) => {
                 const getStatusBadge = (tahap: string) => {
                   const colors: Record<string, string> = {
-                    applied: 'bg-blue-100 text-blue-800', screening: 'bg-indigo-100 text-indigo-800',
-                    interview: 'bg-purple-100 text-purple-800', assessment: 'bg-pink-100 text-pink-800',
-                    medical: 'bg-amber-100 text-amber-800', offering: 'bg-teal-100 text-teal-800',
-                    hired: 'bg-emerald-100 text-emerald-800', rejected: 'bg-rose-100 text-rose-800'
+                    applied: 'bg-blue-100 text-blue-800',
+                    screening: 'bg-indigo-100 text-indigo-800',
+                    interview: 'bg-purple-100 text-purple-800',
+                    assessment: 'bg-pink-100 text-pink-800',
+                    medical: 'bg-amber-100 text-amber-800',
+                    offering: 'bg-teal-100 text-teal-800',
+                    hired: 'bg-emerald-100 text-emerald-800',
+                    rejected: 'bg-rose-100 text-rose-800'
                   };
-                  return (<span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${colors[tahap] || 'bg-slate-100 text-slate-800'}`}>{tahap === 'medical' ? 'Medical Check' : tahap}</span>);
+                  return (
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${colors[tahap] || 'bg-slate-100 text-slate-800'}`}>
+                      {tahap === 'medical' ? 'Medical Check' : tahap}
+                    </span>
+                  );
                 };
                 const getMatchBadge = (rating: number) => {
                   if (rating >= 85) return <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{rating}% Fit</span>;
@@ -579,7 +658,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 };
                 return (
                   <tr key={cand.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4"><div className="flex flex-col"><span className="font-bold text-slate-800">{cand.nama}</span><span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span></div></td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800">{cand.nama}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span>
+                      </div>
+                    </td>
                     <td className="p-4 font-medium text-slate-700">{cand.posisiDilamar}</td>
                     <td className="p-4 text-slate-500">{cand.pendidikan} - {cand.jurusan}</td>
                     <td className="p-4">{getMatchBadge(cand.ratingKecocokan)}</td>
