@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import {
   Plus, Search, Edit3, Trash2, Eye, Download, FileText, Sparkles,
-  AlertTriangle, X, CheckCircle, Filter, Mail, Send, Paperclip,
-  Upload, MessageCircle
+  AlertTriangle, X, CheckCircle, Filter, Mail, Send, MessageCircle
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 
@@ -34,16 +33,12 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [filterAtsScore, setFilterAtsScore] = useState('All');
   const [filterUsia, setFilterUsia] = useState('All');
   const [filterExpectedSalary, setFilterExpectedSalary] = useState('All');
-
   const [selectedCandidateATS, setSelectedCandidateATS] = useState<Candidate | null>(null);
   const [previewCV, setPreviewCV] = useState<Candidate | null>(null);
   const [selectedCandidateEmail, setSelectedCandidateEmail] = useState<Candidate | null>(null);
   const [emailStage, setEmailStage] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
-  const [emailAttachments, setEmailAttachments] = useState<{ name: string; size: number; type: string; dataUrl: string }[]>([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
-
   const [formNama, setFormNama] = useState('');
   const [formTelepon, setFormTelepon] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -64,7 +59,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [formCvDataUrl, setFormCvDataUrl] = useState('');
   const [formCvMimeType, setFormCvMimeType] = useState('');
   const [formKeterangan, setFormKeterangan] = useState('');
-
   const [formTanggalApplied, setFormTanggalApplied] = useState(new Date().toISOString().split('T')[0]);
   const [formTanggalScreening, setFormTanggalScreening] = useState('');
   const [formTanggalInterview, setFormTanggalInterview] = useState('');
@@ -80,23 +74,22 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
   const openWhatsApp = (cand: Candidate) => {
-    if (!canWhatsapp) { 
-      alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.\nHubungi administrator jika Anda memerlukan akses ini.'); 
-      return; 
+    if (!canWhatsapp) {
+      alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.\nHubungi administrator jika Anda memerlukan akses ini.');
+      return;
     }
-    if (!settings.whatsappSettings.enabled) { 
-      alert('Fitur WhatsApp konfirmasi sedang dinonaktifkan pada menu Pengaturan.'); 
-      return; 
+    if (!settings.whatsappSettings.enabled) {
+      alert('Fitur WhatsApp konfirmasi sedang dinonaktifkan pada menu Pengaturan.');
+      return;
     }
-    
     let phone = cand.telepon.replace(/[^0-9]/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.substring(1);
     else if (!phone.startsWith('62')) phone = '62' + phone;
-    
+
     const draft = settings.whatsappSettings.confirmationTemplate
       .replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar)
       .replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
-      
+
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank');
   };
 
@@ -160,13 +153,12 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       }
       return;
     }
-    // Mock CV content for download if no real file
     const mockContent = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 44>>stream\nBT /F1 12 Tf 50 700 Td (CV - ${cand.nama}) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000266 00000 n \n0000000359 00000 n \ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n415\n%%EOF`;
     const blob = new Blob([mockContent], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     element.href = url;
-    element.download = cand.cvName.includes('.pdf') ? cand.cvName : cand.cvName.replace(/\.[^.]+$/, '') + '.pdf';
+    element.download = cand.cvName.includes('.pdf') ? cand.cvName : cand.cvName.replace(/.[^.]+$/, '') + '.pdf';
     document.body.appendChild(element);
     setTimeout(() => { element.click(); document.body.removeChild(element); URL.revokeObjectURL(url); }, 400);
   };
@@ -252,7 +244,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       else missingSkills.push(s);
     });
     const meetsThreshold = cand.ratingKecocokan >= settings.autoScreeningATS;
-
     return (
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
@@ -264,11 +255,8 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 <p className="text-indigo-200 text-[10px]">Verifikasi otomatis dokumen & profil pelamar</p>
               </div>
             </div>
-            <button onClick={() => setSelectedCandidateATS(null)} className="p-1.5 hover:bg-indigo-800 rounded-lg text-indigo-100 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+            <button onClick={() => setSelectedCandidateATS(null)} className="p-1.5 hover:bg-indigo-800 rounded-lg text-indigo-100 transition-colors"><X className="w-5 h-5" /></button>
           </div>
-
           <div className="p-4 sm:p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
               <div>
@@ -283,7 +271,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 </div>
               </div>
             </div>
-
             <div className={`p-4 rounded-xl border flex items-start gap-3 ${meetsThreshold ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
               {meetsThreshold ? <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
               <div>
@@ -295,34 +282,27 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 </p>
               </div>
             </div>
-
             <div className="space-y-2.5">
               <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase block">SKILL MATCH ANALYSIS</span>
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-1.5">
                   <span className="text-[11px] text-slate-400 w-full font-bold">Keahlian Sesuai:</span>
-                  {matchedSkills.map((s, i) => (
-                    <span key={i} className="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">✓ {s}</span>
-                  ))}
+                  {matchedSkills.map((s, i) => (<span key={i} className="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">✓ {s}</span>))}
                   {matchedSkills.length === 0 && <span className="text-slate-400 text-xs italic">Tidak ada keahlian yang terdeteksi cocok.</span>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-slate-100">
                   <span className="text-[11px] text-slate-400 w-full font-bold">Keahlian Kurang (Gap):</span>
-                  {missingSkills.map((s, i) => (
-                    <span key={i} className="bg-rose-50 text-rose-700 font-bold text-[10px] px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1">✗ {s}</span>
-                  ))}
+                  {missingSkills.map((s, i) => (<span key={i} className="bg-rose-50 text-rose-700 font-bold text-[10px] px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1">✗ {s}</span>))}
                   {missingSkills.length === 0 && <span className="text-slate-400 text-xs italic">Semua keahlian terpenuhi!</span>}
                 </div>
               </div>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100 text-xs">
               <div><span className="text-slate-400 block">Pendidikan Formal</span><span className="font-bold text-slate-800">{cand.pendidikan} ({cand.jurusan || 'Jurusan Umum'})</span></div>
               <div><span className="text-slate-400 block">Masa Kerja & Posisi Terakhir</span><span className="font-bold text-slate-800">{cand.pengalaman} Tahun - {cand.jabatanTerakhir || 'Fresh Graduate'}</span></div>
               <div><span className="text-slate-400 block">Current Salary</span><span className="font-bold text-slate-800">{formatRupiah(cand.currentSalary || 0)}</span></div>
               <div><span className="text-slate-400 block">Expected Salary</span><span className="font-bold text-slate-800">{formatRupiah(cand.expectedSalary)}</span></div>
             </div>
-
             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-1">
               <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block">REKOMENDASI SISTEM</span>
               <p className="text-xs text-slate-700 leading-relaxed font-semibold italic">
@@ -334,14 +314,8 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               </p>
             </div>
           </div>
-
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-end">
-            <button
-              onClick={() => setSelectedCandidateATS(null)}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all"
-            >
-              Tutup Analisis
-            </button>
+            <button onClick={() => setSelectedCandidateATS(null)} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all">Tutup Analisis</button>
           </div>
         </div>
       </div>
@@ -355,19 +329,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8 flex flex-col">
           <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-indigo-400" />
-              <h3 className="font-extrabold text-sm">Review Resume / CV - {cand.nama}</h3>
-            </div>
+            <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-indigo-400" /><h3 className="font-extrabold text-sm">Review Resume / CV - {cand.nama}</h3></div>
             <button onClick={() => setPreviewCV(null)} className="p-1 hover:bg-slate-800 rounded text-slate-400"><X className="w-5 h-5" /></button>
           </div>
           <div className="p-0 sm:p-6 bg-slate-50/50 flex-1 overflow-y-auto max-h-[75vh]">
             <div className="bg-white shadow-sm border border-slate-200 w-full max-w-2xl mx-auto sm:rounded-xl overflow-hidden min-h-[500px]">
               <div className="bg-indigo-900 text-white p-6 sm:p-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{cand.nama}</h1>
-                  <p className="text-indigo-200 font-semibold mt-1">{cand.jabatanTerakhir || cand.posisiDilamar}</p>
-                </div>
+                <div><h1 className="text-2xl sm:text-3xl font-black tracking-tight">{cand.nama}</h1><p className="text-indigo-200 font-semibold mt-1">{cand.jabatanTerakhir || cand.posisiDilamar}</p></div>
                 <div className="text-right flex flex-col gap-1 text-xs text-indigo-100">
                   <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">✉</span> {cand.email}</span>
                   <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">☎</span> {cand.telepon}</span>
@@ -376,8 +344,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-100">
                 <div className="p-6 sm:p-8 bg-slate-50 space-y-8 md:col-span-1">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Personal</h3>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Personal</h3>
                     <div className="space-y-3 text-xs text-slate-600">
                       <div><span className="block text-slate-400 font-bold mb-0.5">Gender</span><span>{cand.gender}</span></div>
                       <div><span className="block text-slate-400 font-bold mb-0.5">Tempat, Tanggal Lahir</span><span>{cand.tempatLahir}, {new Date(cand.tanggalLahir).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({hitungUsia(cand.tanggalLahir)} Thn)</span></div>
@@ -386,14 +353,10 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                       <div><span className="block text-slate-400 font-bold mb-0.5">Ekspektasi Gaji</span><span className="font-semibold text-slate-800">{formatRupiah(cand.expectedSalary)}</span></div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Top Skills</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {matchedJob ? matchedJob.skills.slice(0, 5).map(s => (<span key={s} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">{s}</span>)) : <span className="text-xs text-slate-400">Tidak ada data.</span>}
-                    </div>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Top Skills</h3>
+                    <div className="flex flex-wrap gap-1.5">{matchedJob ? matchedJob.skills.slice(0, 5).map(s => (<span key={s} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">{s}</span>)) : <span className="text-xs text-slate-400">Tidak ada data.</span>}</div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">ATS Score</h3>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">ATS Score</h3>
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-[10px] text-white ${cand.ratingKecocokan >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`}>{cand.ratingKecocokan}%</div>
                       <span className="text-[10px] text-slate-500 font-semibold leading-tight">{cand.ratingKecocokan >= 70 ? 'Recommended' : 'Needs Review'}</span>
@@ -401,46 +364,23 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                   </div>
                 </div>
                 <div className="p-6 sm:p-8 md:col-span-2 space-y-8">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pengalaman Kerja</h3>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pengalaman Kerja</h3>
                     <div className="relative pl-4 border-l-2 border-slate-100 space-y-6">
-                      <div className="relative">
-                        <div className="absolute w-2.5 h-2.5 bg-indigo-500 rounded-full -left-[21px] top-1 ring-4 ring-white"></div>
-                        <h4 className="font-bold text-slate-800 text-sm">{cand.jabatanTerakhir || cand.posisiDilamar}</h4>
-                        <p className="text-xs text-slate-500 font-medium mb-2">Total Pengalaman: {cand.pengalaman} Tahun</p>
-                        <p className="text-xs text-slate-600 leading-relaxed">Berpengalaman selama {cand.pengalaman} tahun dalam bidang {cand.jurusan || 'yang relevan'}, terbiasa bekerja dalam tim maupun individu dengan orientasi pencapaian target dan solusi yang inovatif.</p>
-                      </div>
+                      <div className="relative"><div className="absolute w-2.5 h-2.5 bg-indigo-500 rounded-full -left-[21px] top-1 ring-4 ring-white"></div><h4 className="font-bold text-slate-800 text-sm">{cand.jabatanTerakhir || cand.posisiDilamar}</h4><p className="text-xs text-slate-500 font-medium mb-2">Total Pengalaman: {cand.pengalaman} Tahun</p><p className="text-xs text-slate-600 leading-relaxed">Berpengalaman selama {cand.pengalaman} tahun dalam bidang {cand.jurusan || 'yang relevan'}, terbiasa bekerja dalam tim maupun individu dengan orientasi pencapaian target dan solusi yang inovatif.</p></div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pendidikan Formal</h3>
-                    <div className="relative pl-4 border-l-2 border-slate-100">
-                      <div className="relative">
-                        <div className="absolute w-2.5 h-2.5 bg-slate-300 rounded-full -left-[21px] top-1 ring-4 ring-white"></div>
-                        <h4 className="font-bold text-slate-800 text-sm">{cand.jurusan || 'Jurusan Umum'}</h4>
-                        <p className="text-xs text-slate-500 font-medium mb-1">Gelar: {cand.pendidikan}</p>
-                      </div>
-                    </div>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pendidikan Formal</h3>
+                    <div className="relative pl-4 border-l-2 border-slate-100"><div className="relative"><div className="absolute w-2.5 h-2.5 bg-slate-300 rounded-full -left-[21px] top-1 ring-4 ring-white"></div><h4 className="font-bold text-slate-800 text-sm">{cand.jurusan || 'Jurusan Umum'}</h4><p className="text-xs text-slate-500 font-medium mb-1">Gelar: {cand.pendidikan}</p></div></div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Aplikasi Pekerjaan</h3>
-                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-xs">
-                      <p className="text-indigo-900 mb-1">Posisi dilamar:</p>
-                      <p className="font-black text-indigo-700 text-sm">{cand.posisiDilamar}</p>
-                      <p className="text-indigo-600 mt-2 font-semibold">Tanggal Apply: {cand.tanggalApplied}</p>
-                    </div>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Aplikasi Pekerjaan</h3>
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-xs"><p className="text-indigo-900 mb-1">Posisi dilamar:</p><p className="font-black text-indigo-700 text-sm">{cand.posisiDilamar}</p><p className="text-indigo-600 mt-2 font-semibold">Tanggal Apply: {cand.tanggalApplied}</p></div>
                   </div>
                   {cand.cvDataUrl && (
-                    <div>
-                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Dokumen Terlampir</h3>
+                    <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Dokumen Terlampir</h3>
                       <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
-                        {cand.cvMimeType?.includes('image') ? (
-                          <img src={cand.cvDataUrl} alt={cand.cvName} className="w-full max-h-[320px] object-contain bg-white" />
-                        ) : cand.cvMimeType?.includes('pdf') ? (
-                          <iframe src={cand.cvDataUrl} title={cand.cvName} className="w-full h-[320px] bg-white" />
-                        ) : (
-                          <div className="p-6 text-center text-xs text-slate-500">Preview tidak tersedia untuk format ini. Silakan gunakan tombol download untuk membuka dokumen.</div>
-                        )}
+                        {cand.cvMimeType?.includes('image') ? (<img src={cand.cvDataUrl} alt={cand.cvName} className="w-full max-h-[320px] object-contain bg-white" />)
+                          : cand.cvMimeType?.includes('pdf') ? (<iframe src={cand.cvDataUrl} title={cand.cvName} className="w-full h-[320px] bg-white" />)
+                            : (<div className="p-6 text-center text-xs text-slate-500">Preview tidak tersedia untuk format ini. Silakan gunakan tombol download untuk membuka dokumen.</div>)}
                       </div>
                     </div>
                   )}
@@ -457,107 +397,73 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     );
   };
 
-  // ─── EMAIL MODAL ─────────────────────────────────────────────────────
+  // ─── EMAIL MODAL (UPLOAD DISABLED) ───────────────────────────────────
   const renderEmailModal = (cand: Candidate) => {
     const template = settings.emailSettings.templates[emailStage];
     const replacedSubject = template.subject.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
     const replacedBody = template.body.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
 
-    const formatFileSize = (bytes: number): string => {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    };
-
-    // 🔹 PERBAIKAN FINAL: Logika Email Universal + Fallback Copy
-    const handleSendEmail = () => {
+    // 🔹 PERBAIKAN FINAL: Tanpa Upload, Tab Tidak Tertutup, Manual Attach
+    const handleSendEmail = async () => {
       const subject = replacedSubject;
-      let body = replacedBody;
-
-      if (emailAttachments.length > 0) {
-        const attachmentList = emailAttachments.map(a => `• ${a.name}`).join('\n');
-        body += `\n\n---\nLampiran Terlampir:\n${attachmentList}\n(Catatan: Silakan lampirkan file secara manual di aplikasi email Anda)`;
-      }
-
-      // Siapkan teks lengkap untuk dicopy (Fallback Utama)
+      const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // Coba buka mailto: universal (Outlook, Thunderbird, Gmail Web, dll)
-      const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
-      // Deteksi Mobile untuk UX yang lebih baik
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Deteksi Gmail Web
+      const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
+      let isGoogleLoggedIn = false;
+      try {
+        const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
+        isGoogleLoggedIn = response.type === 'opaque' || response.ok;
+      } catch {
+        isGoogleLoggedIn = false;
+      }
+      const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
-      if (isMobile) {
-        window.location.href = mailtoLink;
-        navigator.clipboard.writeText(fullEmailText).then(() => {
-           alert('📱 Mode Mobile Terdeteksi\n\n1. Aplikasi email seharusnya telah terbuka.\n2. Jika tidak, Template & Alamat Tujuan SUDAH DISALIN ke clipboard.\n3. Silakan Paste (Tempel) di kolom Subjek & Isi Pesan.');
-        }).catch(() => {
-           alert('⚠️ Gagal menyalin template. Silakan copy manual dari preview di atas.');
-        });
+      if (useGmailCompose) {
+        // ─── GMAIL WEB: Buka tab baru Gmail Compose ───
+        const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        const newTab = window.open(gmailComposeUrl, '_blank');
+
+        if (newTab) {
+          alert(
+            `✅ Gmail Compose terbuka di tab baru!\n\n` +
+            `📎 Lampiran harus dilampirkan MANUAL:\n` +
+            `1. Klik ikon 📎 (Attach files) di Gmail\n` +
+            `2. Pilih file CV/dokumen dari komputer Anda\n\n` +
+            `💡 Tip: Gunakan tombol "Download CV" di tabel kandidat\n` +
+            `   sebelum mengirim email agar file siap dilampirkan.`
+          );
+        } else {
+          // Popup diblokir → fallback copy
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+          alert(
+            `⚠️ Tab Gmail diblokir oleh browser.\n\n` +
+            `Template email SUDAH DISALIN ke clipboard.\n` +
+            `Silakan buka Gmail manual dan Paste (Ctrl+V).\n` +
+            `Lampirkan file secara manual.`
+          );
+        }
       } else {
-        // Desktop: Coba buka mailto, lalu beri instruksi paste jika gagal/diblokir
-        window.location.href = mailtoLink;
-        
-        // Karena kita tidak bisa mendeteksi apakah mailto berhasil dibuka atau diblokir dengan pasti di semua browser,
-        // Kita asumsikan user perlu instruksi paste sebagai backup yang aman.
-        navigator.clipboard.writeText(fullEmailText).then(() => {
-           alert('✅ Template Email Berhasil Disalin!\n\n1. Aplikasi email default Anda akan terbuka.\n2. Pastikan alamat tujuan sudah terisi.\n3. PASTE (Ctrl+V / Cmd+V) di kolom Subjek dan Isi Pesan.\n4. Lampirkan file secara manual jika diperlukan.');
-        }).catch(() => {
-           alert('⚠️ Gagal menyalin template otomatis. Silakan copy manual dari preview Subject & Body di atas, lalu paste ke email Anda.');
-        });
+        // ─── DESKTOP EMAIL: mailto: di tab baru + copy template ───
+        const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailtoLink, '_blank');
+
+        setTimeout(async () => {
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+          alert(
+            `📧 Email Desktop Terdeteksi (Outlook/Thunderbird/dll)\n\n` +
+            `✅ Aplikasi email seharusnya sudah terbuka di tab baru.\n` +
+            `✅ Template SUDAH DISALIN ke clipboard (Ctrl+V sebagai backup).\n\n` +
+            `📎 Lampiran harus dilampirkan MANUAL:\n` +
+            `Klik tombol 📎 Attach di email Anda, lalu pilih file.\n\n` +
+            `💡 Tip: Gunakan tombol "Download CV" di tabel kandidat\n` +
+            `   sebelum mengirim email agar file siap dilampirkan.`
+          );
+        }, 800);
       }
 
       setSelectedCandidateEmail(null);
-      setEmailAttachments([]);
-    };
-
-    const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
-      const maxSize = 10 * 1024 * 1024;
-      const newAttachments: { name: string; size: number; type: string; dataUrl: string }[] = [];
-      let processedCount = 0;
-
-      Array.from(files).forEach((file) => {
-        if (file.size > maxSize) {
-          alert(`File "${file.name}" melebihi batas maksimum 10MB.`);
-          processedCount++;
-          if (processedCount === files.length) e.target.value = '';
-          return;
-        }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          newAttachments.push({
-            name: file.name,
-            size: file.size,
-            type: file.type || 'application/octet-stream',
-            dataUrl: reader.result as string
-          });
-          processedCount++;
-          if (processedCount === files.length) {
-            setEmailAttachments(prev => [...prev, ...newAttachments]);
-            e.target.value = '';
-          }
-        };
-        reader.onerror = () => {
-          console.error(`Error reading file: ${file.name}`);
-          processedCount++;
-          if (processedCount === files.length) e.target.value = '';
-        };
-        reader.readAsDataURL(file);
-      });
-    };
-
-    const removeAttachment = (index: number) => setEmailAttachments(prev => prev.filter((_, i) => i !== index));
-
-    const getFileIcon = (type: string) => {
-      if (type.includes('pdf')) return '📄';
-      if (type.includes('image')) return '🖼️';
-      if (type.includes('word') || type.includes('document')) return '📝';
-      if (type.includes('excel') || type.includes('spreadsheet')) return '📊';
-      if (type.includes('zip') || type.includes('rar')) return '🗜️';
-      return '📎';
     };
 
     return (
@@ -571,7 +477,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 <p className="text-indigo-100 text-[10px] sm:text-xs">Kirim email untuk tahapan rekrutmen kandidat</p>
               </div>
             </div>
-            <button onClick={() => { setSelectedCandidateEmail(null); setEmailAttachments([]); }} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+            <button onClick={() => setSelectedCandidateEmail(null)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
           </div>
 
           <div className="p-4 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -612,55 +518,23 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               </div>
             </div>
 
-            <div className="border-t border-slate-200 pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
-                  Lampiran Attachment
-                  {emailAttachments.length > 0 && <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-[9px] font-extrabold">{emailAttachments.length}</span>}
-                </label>
-                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100 transition-all select-none">
-                  <Upload className="w-3 h-3" /> Upload File
-                  <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.zip,.rar" onChange={handleAttachmentUpload} className="hidden" id="email-attachment-input" />
-                </label>
+            {/* 🔹 INFO BOX: Pengganti Upload Section */}
+            <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h5 className="font-bold text-xs text-amber-800 uppercase tracking-wider mb-1">Lampiran Dilakukan Secara Manual</h5>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    Untuk alasan keamanan browser, lampiran file tidak dapat disertakan secara otomatis.
+                    Silakan gunakan tombol <strong>"Download CV"</strong> di tabel kandidat terlebih dahulu,
+                    kemudian lampirkan file secara manual setelah email terbuka.
+                  </p>
+                </div>
               </div>
-              {emailAttachments.length === 0 ? (
-                <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center bg-slate-50">
-                  <Paperclip className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-xs text-slate-500 font-semibold">Belum ada lampiran</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Upload dokumen pendukung (PDF, DOC, XLS, gambar) max 10MB per file</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {emailAttachments.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg group hover:bg-slate-100 transition-colors">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className="text-xl shrink-0">{getFileIcon(file.type)}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-slate-700 truncate">{file.name}</p>
-                          <p className="text-[10px] text-slate-400 font-medium">{formatFileSize(file.size)}</p>
-                        </div>
-                      </div>
-                      <button onClick={() => removeAttachment(idx)} className="p-1.5 hover:bg-rose-100 text-rose-500 hover:text-rose-700 rounded-md transition-all shrink-0 ml-2" title="Hapus Lampiran"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 pt-2 border-t border-slate-100">
-                    <span>Total {emailAttachments.length} file</span>
-                    <span>{formatFileSize(emailAttachments.reduce((sum, f) => sum + f.size, 0))}</span>
-                  </div>
-                </div>
-              )}
-              <p className="text-[10px] text-slate-400 mt-2 italic">Format yang didukung: PDF, DOC, DOCX, XLS, XLSX, PPT, PNG, JPG, ZIP, RAR</p>
             </div>
           </div>
 
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-            {emailAttachments.length > 0 && (
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                <Paperclip className="w-3 h-3" />
-                <span>{emailAttachments.length} lampiran ({formatFileSize(emailAttachments.reduce((sum, f) => sum + f.size, 0))})</span>
-              </div>
-            )}
             <div className="flex items-center gap-3 ml-auto">
               <button
                 type="button"
@@ -677,7 +551,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               >
                 📋 Salin Template
               </button>
-              <button onClick={() => { setSelectedCandidateEmail(null); setEmailAttachments([]); }} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">Batal</button>
+              <button onClick={() => setSelectedCandidateEmail(null)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">Batal</button>
               <button onClick={handleSendEmail} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20"><Send className="w-4 h-4" /> Kirim Email</button>
             </div>
           </div>
