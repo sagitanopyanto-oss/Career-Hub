@@ -212,7 +212,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
 
   const trendData = trendMonths.map(m => {
     // 🔹 FIX: Gunakan trim() untuk menghindari spasi ekstra di status
-    const activeJobsCount = filteredJobs.filter(j => j.status === 'Aktif').length; // ✅ Ini benar
+    const jobsCreated = jobs.filter(j => { ... }).length;
       const jd = new Date(j.createdAt);
       return jd.getMonth() === m.monthNum 
         && jd.getFullYear() === m.year 
