@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   Users, Briefcase, UserCheck, Stethoscope, FileCheck, Activity,
-  CalendarClock, Clock, ArrowUpRight, Award, CheckCircle,
-  DollarSign, ChevronDown
+  CalendarClock, Clock, ArrowUpRight, TrendingUp, Award, CheckCircle,
+  DollarSign, AlertTriangle
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 import { RecruitmentCharts } from './RecruitmentCharts';
@@ -29,12 +29,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const nowDate = new Date();
 
-  // 🔹 NEW: Multi-year selection state
-  const [selectedYears, setSelectedYears] = useState<number[]>(
-    filterYear === 0 ? [] : [filterYear]
-  );
-  const [showYearDropdown, setShowYearDropdown] = useState(false);
-
   // Safe Data Handling
   const safeCandidates = candidates || [];
   const safeJobs = jobs || [];
@@ -48,30 +42,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     nowDate.getFullYear()
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
 
-  // Sync selectedYears with filterYear prop
-  useEffect(() => {
-    if (filterYear === 0) {
-      setSelectedYears([]);
-    } else if (!selectedYears.includes(filterYear)) {
-      setSelectedYears([filterYear]);
-    }
-  }, [filterYear]);
-
-  const handleYearToggle = (year: number) => {
-    const newSelected = selectedYears.includes(year)
-      ? selectedYears.filter(y => y !== year)
-      : [...selectedYears, year];
-    setSelectedYears(newSelected);
-    // Sync to filterYear: jika 1 tahun → set, jika >1 atau 0 → set 0 (all years)
-    if (newSelected.length === 1) {
-      setFilterYear(newSelected[0]);
-    } else {
-      setFilterYear(0);
-    }
-  };
-
   const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
-
   const diffInDays = (d1: string, d2: string) => {
     if (!d1 || !d2) return 0;
     return Math.max(0, Math.floor((new Date(d1).getTime() - new Date(d2).getTime()) / (1000 * 60 * 60 * 24)));
@@ -178,6 +149,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
     .slice(0, 5);
 
+  // --- CHART A: AGGREGATE COST HIRING (Total Budget vs Actual per Year) ---
+  const costHiringAggData = useMemo(() => {
+    const budgetByYear = safeBudgets.reduce((acc, b) => {
+      acc[b.year] = (acc[b.year] || 0) + b.budget;
+      return acc;
+    }, {} as Record<number, number>);
+
+    const actualByYear = displayCandidates
+      .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
+      .reduce((acc, c) => {
+        const y = new Date(c.tanggalHired).getFullYear();
+        acc[y] = (acc[y] || 0) + (c.expectedSalary || 0);
+        return acc;
+      }, {} as Record<number, number>);
+
+    const allYearsSet = new Set([...Object.keys(budgetByYear), ...Object.keys(actualByYear)].map(Number));
+    let chartYears = Array.from(allYearsSet).sort((a, b) => a - b);
+
+    if (filterYear !== 0) {
+      chartYears = chartYears.filter(y => y === filterYear);
+    }
+
+    return chartYears.map(year => ({
+      year,
+      budget: budgetByYear[year] || 0,
+      actual: actualByYear[year] || 0
+    }));
+  }, [safeBudgets, displayCandidates, filterYear]);
+
+  const maxAggVal = Math.max(...costHiringAggData.flatMap(d => [d.budget, d.actual]), 1);
   const formatIDR = (val: number) => {
     if (val >= 1000000000) return `Rp ${(val / 1000000000).toFixed(1)} M`;
     if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1)} Jt`;
@@ -197,53 +198,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ];
   const maxPipelineVal = Math.max(...pipelineData.map(p => p.count), 1);
 
-  // 🔹 NEW: Cost Hiring per Department (Vertical Bar Chart Data)
-  const costHiringPerDept = useMemo(() => {
-    if (!safeSettings.budgetCostHiring) return [];
-    const budgetMap: Record<string, number> = {};
-    safeSettings.budgetCostHiring
-      .filter(b => filterYear === 0 || b.year === filterYear)
-      .forEach(b => {
-        budgetMap[b.department] = (budgetMap[b.department] || 0) + b.budget;
-      });
-
-    const actualMap: Record<string, number> = {};
-    displayCandidates
-      .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
-      .forEach(c => {
-        const dept = safeJobs.find(j => j.judul === c.posisiDilamar)?.department || c.posisiDilamar;
-        actualMap[dept] = (actualMap[dept] || 0) + (c.expectedSalary || 0);
-      });
-
-    return Object.keys(budgetMap).map(dept => ({
-      department: dept,
-      budget: budgetMap[dept] || 0,
-      actual: actualMap[dept] || 0,
-      status: (actualMap[dept] || 0) > (budgetMap[dept] || 0) ? 'OVER' : 'SAFE'
-    }));
-  }, [safeSettings.budgetCostHiring, displayCandidates, filterYear, safeJobs]);
-
-  const maxCostVal = Math.max(...costHiringPerDept.map(d => Math.max(d.budget, d.actual)), 1);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = () => setShowYearDropdown(false);
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
   return (
     <div className="space-y-6">
       {/* Header Filters */}
       <div className="bg-slate-900 text-white p-4 sm:p-6 rounded-2xl shadow-md space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight">
-              Selamat Datang Kembali, Team Rekrutmen!
-            </h2>
-            <p className="text-slate-400 text-xs md:text-sm mt-1">
-              Analisis performa, SLA rekrutmen, dan funnel pelamar secara real-time.
-            </p>
+            <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold tracking-tight">Selamat Datang Kembali, Team Rekrutmen!</h2>
+            <p className="text-slate-400 text-xs md:text-sm mt-1">Analisis performa, SLA rekrutmen, dan funnel pelamar secara real-time.</p>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 self-start lg:self-auto bg-slate-800 p-1.5 rounded-lg border border-slate-700 overflow-x-auto shrink-0">
             <span className="text-[10px] sm:text-xs text-slate-400 font-semibold px-2 whitespace-nowrap">Periode:</span>
@@ -266,52 +228,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800">
           <div className="flex items-center gap-2.5 shrink-0">
             <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Tahun:</span>
-            
-            {/* 🔹 MULTI-CHECKBOX YEAR FILTER */}
-            <div className="relative">
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowYearDropdown(!showYearDropdown); }}
-                className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer min-w-[140px]"
-              >
-                <span className="flex-1 text-left truncate">
-                  {selectedYears.length === 0 ? 'Semua Tahun' : selectedYears.length === 1 ? `${selectedYears[0]}` : `${selectedYears.length} Tahun`}
-                </span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showYearDropdown && (
-                <div 
-                  className="absolute top-full left-0 mt-1 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50 overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="p-2 border-b border-slate-700 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase px-1">Pilih Tahun</span>
-                    {selectedYears.length > 0 && (
-                      <button 
-                        onClick={() => { setSelectedYears([]); setFilterYear(0); }}
-                        className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold px-2 py-1 rounded hover:bg-slate-700"
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-[240px] overflow-y-auto p-1.5 space-y-0.5">
-                    {allYears.map(year => {
-                      const isSelected = selectedYears.includes(year);
-                      return (
-                        <label key={year} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${isSelected ? 'bg-indigo-600/20 border border-indigo-500/30' : 'hover:bg-slate-700/50 border border-transparent'}`}>
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-500 bg-slate-700'}`}>
-                            {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
-                          </div>
-                          <input type="checkbox" checked={isSelected} onChange={() => handleYearToggle(year)} className="hidden" />
-                          <span className={`text-xs font-bold ${isSelected ? 'text-indigo-300' : 'text-slate-300'}`}>{year}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
+            <select
+              value={filterYear}
+              onChange={(e) => { setFilterYear(Number(e.target.value)); setFilterQuarters([]); }}
+              className="bg-slate-800 border border-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
+            >
+              <option value={0}>Semua Tahun</option>
+              {allYears.map(y => (<option key={y} value={y}>{y}</option>))}
+            </select>
           </div>
 
           <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
@@ -358,7 +282,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {filterYear !== 0 ? `${filterYear}` : ''}
                 {filterQuarters.length > 0 ? ` · ${filterQuarters.map(q => `Q${q}`).join(', ')}` : ''}
               </span>
-              <button onClick={() => { setFilterYear(nowDate.getFullYear()); setFilterQuarters([]); setSelectedYears([]); }} className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2">Reset</button>
+              <button onClick={() => { setFilterYear(nowDate.getFullYear()); setFilterQuarters([]); }} className="text-[9px] text-slate-500 hover:text-slate-300 font-bold transition-colors underline underline-offset-2">Reset</button>
             </div>
           )}
         </div>
@@ -423,15 +347,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 🔹 NEW: Cost Hiring per Department — Vertical Bar Chart (ABOVE Trend Chart) */}
+      {/* 🔹 CHART A: AGGREGATE COST HIRING (Total Budget vs Actual per Year) */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring per Departemen
+              <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring: Total Budget vs Actual
             </h3>
             <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5">
-              Perbandingan alokasi budget vs pengeluaran riil per departemen
+              Perbandingan total alokasi budget vs realisasi pengeluaran per tahun
               {filterYear !== 0 && <span className="font-bold text-indigo-600"> (Tahun {filterYear})</span>}
             </p>
           </div>
@@ -441,47 +365,94 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="h-[250px] flex items-end justify-around gap-2 pt-4 pb-2 overflow-x-auto">
-          {costHiringPerDept.length > 0 ? (
-            costHiringPerDept.map((item, idx) => {
-              const budgetHeight = (item.budget / maxCostVal) * 100;
-              const actualHeight = (item.actual / maxCostVal) * 100;
-              return (
-                <div key={idx} className="flex flex-col items-center gap-1 flex-1 min-w-[60px] group">
-                  <div className="flex items-end gap-1 h-[200px] w-full justify-center relative">
-                    <div
-                      className="w-6 bg-indigo-500 rounded-t-sm transition-all duration-500 hover:bg-indigo-600"
-                      style={{ height: `${Math.max(budgetHeight, 2)}%` }}
-                      title={`Budget: ${formatIDR(item.budget)}`}
-                    ></div>
-                    <div
-                      className={`w-6 rounded-t-sm transition-all duration-500 ${
-                        item.status === 'OVER' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'
-                      }`}
-                      style={{ height: `${Math.max(actualHeight, 2)}%` }}
-                      title={`Actual: ${formatIDR(item.actual)}`}
-                    ></div>
-                  </div>
-                  <div className="text-center mt-2">
-                    <span className="text-[10px] font-semibold text-slate-600 block truncate max-w-[60px]" title={item.department}>
-                      {item.department}
-                    </span>
-                    <span className="text-[9px] text-slate-400">
-                      {formatIDR(item.actual)} / {formatIDR(item.budget)}
+        {costHiringAggData.length > 0 ? (
+          <div className="relative h-64 w-full border-b border-l border-slate-200 pl-10 pb-2">
+            {/* Y-Axis Labels */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
+              {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
+                const val = maxAggVal * ratio;
+                return (
+                  <div key={ratio} className="border-t border-dashed border-slate-100 w-full h-0 relative flex items-center">
+                    <span className="absolute -left-10 text-[9px] text-slate-400 font-medium w-8 text-right pr-2">
+                      {val >= 1000000 ? `${(val / 1000000).toFixed(0)}jt` : val.toLocaleString('id-ID')}
                     </span>
                   </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="w-full text-center text-slate-400 text-xs py-10">
-              Tidak ada data budget untuk periode yang dipilih.
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {/* Bars Container */}
+            <div className="absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2">
+              {costHiringAggData.map((item) => {
+                const budgetHeight = (item.budget / maxAggVal) * 100;
+                const actualHeight = (item.actual / maxAggVal) * 100;
+                const isOver = item.actual > item.budget && item.budget > 0;
+                const variance = item.budget > 0 ? ((item.actual - item.budget) / item.budget * 100).toFixed(1) : null;
+
+                return (
+                  <div key={item.year} className="flex flex-col items-center gap-2 group relative flex-1 max-w-[80px]">
+                    {/* Tooltip on Hover */}
+                    <div className="absolute -top-28 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px]">
+                      <div className="font-bold mb-2 text-xs border-b border-slate-600 pb-1">Tahun {item.year}</div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <span className="text-slate-300">Budget:</span>  <span className="text-right font-semibold">{formatIDR(item.budget)}</span>
+                        <span className="text-slate-300">Actual:</span>  <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>{formatIDR(item.actual)}</span>
+                        <span className="text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1">Variance:</span>
+                        <span className={`col-span-2 text-right font-bold ${variance && Number(variance) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {variance !== null ? `${Number(variance) >= 0 ? '+' : ''}${variance}%` : '-'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* The Bars */}
+                    <div className="flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1">
+                      {/* Budget Bar */}
+                      <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/bar">
+                        <div
+                          className="w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative"
+                          style={{ height: `${Math.max(budgetHeight, 2)}%` }}
+                        >
+                          {item.budget > 0 && (
+                            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap">
+                              {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actual Bar */}
+                      <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/act">
+                        <div
+                          className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
+                          style={{ height: `${Math.max(actualHeight, 2)}%` }}
+                        >
+                          {item.actual > 0 && (
+                            <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* X-Axis Label */}
+                    <div className="text-center mt-2">
+                      <span className="text-xs font-bold text-slate-600 block">{item.year}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
+            <DollarSign className="w-8 h-8 opacity-30" />
+            <p className="text-sm font-medium">Tidak ada data cost hiring untuk periode yang dipilih.</p>
+          </div>
+        )}
       </div>
 
-      {/* Recruitment Visualizations (Tren Lowongan vs Rekrutmen - FIXED: Only Active Jobs) */}
+      {/* Recruitment Visualizations (Includes Chart B: Cost Hiring per Dept & Trend) */}
       <RecruitmentCharts
         candidates={displayCandidates}
         jobs={filteredJobs}
