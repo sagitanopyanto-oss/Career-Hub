@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Users, Briefcase, UserCheck, Stethoscope, FileCheck, Activity,
   CalendarClock, Clock, ArrowUpRight, TrendingUp, Award, CheckCircle,
-  DollarSign, AlertTriangle
+  DollarSign, AlertTriangle, X
 } from 'lucide-react';
 import { Candidate, Job, AppSettings } from '../data/mockData';
 import { RecruitmentCharts } from './RecruitmentCharts';
@@ -28,6 +28,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   setActiveMenu
 }) => {
   const nowDate = new Date();
+  const [selectedDetailYear, setSelectedDetailYear] = useState<number | null>(null);
 
   // Safe Data Handling
   const safeCandidates = candidates || [];
@@ -43,7 +44,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
 
   const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
-
   const diffInDays = (d1: string, d2: string) => {
     if (!d1 || !d2) return 0;
     return Math.max(0, Math.floor((new Date(d1).getTime() - new Date(d2).getTime()) / (1000 * 60 * 60 * 24)));
@@ -61,29 +61,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return true;
   };
 
-  // FIXED: Strict filter logic for all combinations
   const isWithinFilterRange = (dateStr?: string) => {
     if (!dateStr) return false;
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return false;
-
-    // Priority 1: Quarter filter overrides range logic but respects year
-    if (filterQuarters.length > 0) {
-      return isWithinYearAndQuarter(dateStr);
-    }
-
-    // Priority 2: Year filter
+    if (filterQuarters.length > 0) return isWithinYearAndQuarter(dateStr);
     if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
-
-    // Priority 3: Range filter
     if (filterRange === 'month') {
       return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
     } else if (filterRange === '6months') {
       const sixMonthsAgo = new Date(nowDate);
       sixMonthsAgo.setMonth(nowDate.getMonth() - 6);
-      return date >= sixMonthsAgo && date <= nowDate; // FIXED: Added upper bound
+      return date >= sixMonthsAgo && date <= nowDate;
     }
-    // 'annual' or default: already filtered by year above
     return true;
   };
 
@@ -119,7 +109,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const targetSetting = safeSettings.targetSlaDays.find(t => t.stage === stg.key);
     const targetDays = targetSetting ? targetSetting.targetDays : 3;
     let candidateCount = 0, compliantCount = 0, violationCount = 0;
-
     displayCandidates.forEach(c => {
       const startVal = (c as any)[stg.startKey];
       const endVal = (c as any)[stg.endKey];
@@ -134,7 +123,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }
       }
     });
-
     const rate = candidateCount > 0 ? Math.round((compliantCount / candidateCount) * 100) : 0;
     totalCompliant += compliantCount;
     totalViolation += violationCount;
@@ -161,22 +149,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
     .slice(0, 5);
 
-  // Aggregate Cost Hiring Chart Data
-  const totalBudget = safeBudgets
-    .filter(b => filterYear === 0 ? true : b.year === filterYear)
-    .reduce((sum, b) => sum + b.budget, 0);
+  // --- AGGREGATE COST HIRING CHART DATA & VISUALIZATION ---
+  const costHiringAggData = useMemo(() => {
+    const budgetByYear = safeBudgets.reduce((acc, b) => {
+      acc[b.year] = (acc[b.year] || 0) + b.budget;
+      return acc;
+    }, {} as Record<number, number>);
 
-  const totalActual = displayCandidates
-    .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
-    .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
+    const actualByYear = displayCandidates
+      .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
+      .reduce((acc, c) => {
+        const y = new Date(c.tanggalHired).getFullYear();
+        acc[y] = (acc[y] || 0) + (c.expectedSalary || 0);
+        return acc;
+      }, {} as Record<number, number>);
 
+    const allYearsSet = new Set([...Object.keys(budgetByYear), ...Object.keys(actualByYear)].map(Number));
+    let chartYears = Array.from(allYearsSet).sort((a, b) => a - b);
+
+    if (filterYear !== 0) {
+      chartYears = chartYears.filter(y => y === filterYear);
+    }
+
+    return chartYears.map(year => ({
+      year,
+      budget: budgetByYear[year] || 0,
+      actual: actualByYear[year] || 0
+    }));
+  }, [safeBudgets, displayCandidates, filterYear]);
+
+  const maxAggVal = Math.max(...costHiringAggData.flatMap(d => [d.budget, d.actual]), 1);
   const formatIDR = (val: number) => {
     if (val >= 1000000000) return `Rp ${(val / 1000000000).toFixed(1)} M`;
     if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1)} Jt`;
     return `Rp ${val.toLocaleString('id-ID')}`;
   };
 
-  // Pipeline Tahap Rekrutmen Data
+  // Pipeline Data
   const pipelineData = [
     { label: 'Applied', count: displayCandidates.filter(c => c.tahapProses === 'applied').length, color: 'bg-blue-500' },
     { label: 'Screening', count: displayCandidates.filter(c => c.tahapProses === 'screening').length, color: 'bg-indigo-500' },
@@ -211,7 +220,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ))}
           </div>
         </div>
-
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-slate-800">
           <div className="flex items-center gap-2.5 shrink-0">
             <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Tahun:</span>
@@ -224,9 +232,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {allYears.map(y => (<option key={y} value={y}>{y}</option>))}
             </select>
           </div>
-
           <div className="hidden sm:block w-px h-8 bg-slate-700 shrink-0" />
-
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-[10px] sm:text-xs text-slate-400 font-semibold whitespace-nowrap">Kuartal:</span>
             {[
@@ -255,7 +261,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button onClick={() => setFilterQuarters([])} className="text-[10px] text-slate-500 hover:text-rose-400 font-bold transition-colors underline underline-offset-2">Reset Q</button>
             )}
           </div>
-
           {(filterYear !== 0 || filterQuarters.length > 0) && (
             <div className="flex items-center gap-1.5 ml-auto">
               <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold flex items-center gap-1">
@@ -327,149 +332,110 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-  {/* 🔹 REVISED: AGGREGATE COST HIRING CHART - VISUAL BAR CHART WITH TOOLTIP */}
-   <div className= "bg-white rounded-xl border border-slate-100 shadow-sm p-5 " >
-     <div className= "flex items-center justify-between mb-6 " >
-       <div >
-         <h3 className= "font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2 " >
-           <DollarSign className= "w-4 h-4 text-indigo-600 " / > Cost Hiring: Total Budget vs Actual
-         </h3 >
-         <p className= "text-slate-400 text-[11px] sm:text-xs mt-0.5 " >
-          Perbandingan total alokasi budget vs realisasi pengeluaran per tahun
-          {filterYear !== 0  & &  <span className= "font-bold text-indigo-600 " > (Tahun {filterYear}) </span >}
-         </p >
-       </div >
-       <div className= "flex items-center gap-2 text-[10px] font-bold " >
-         <span className= "flex items-center gap-1 " > <span className= "w-2 h-2 rounded-full bg-indigo-600 " > </span > Budget </span >
-         <span className= "flex items-center gap-1 " > <span className= "w-2 h-2 rounded-full bg-emerald-500 " > </span > Actual </span >
-       </div >
-     </div >
+      {/* 🔹 REVISED: AGGREGATE COST HIRING CHART - VISUAL BAR CHART WITH TOOLTIP */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-indigo-600" /> Cost Hiring: Total Budget vs Actual
+            </h3>
+            <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5">
+              Perbandingan total alokasi budget vs realisasi pengeluaran per tahun
+              {filterYear !== 0 && <span className="font-bold text-indigo-600"> (Tahun {filterYear})</span>}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-bold">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600"></span> Budget</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Actual</span>
+          </div>
+        </div>
 
-    {/* Prepare yearly aggregated data for chart */}
-     {(() => {
-      // Aggregate budget and actual by year
-      const budgetByYear = safeBudgets.reduce((acc, b) => {
-        acc[b.year] = (acc[b.year] || 0) + b.budget;
-        return acc;
-      }, {} as Record<number, number>);
+        {costHiringAggData.length > 0 ? (
+          <div className="relative h-64 w-full border-b border-l border-slate-200 pl-10 pb-2">
+            {/* Y-Axis Labels */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
+              {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
+                const val = maxAggVal * ratio;
+                return (
+                  <div key={ratio} className="border-t border-dashed border-slate-100 w-full h-0 relative flex items-center">
+                    <span className="absolute -left-10 text-[9px] text-slate-400 font-medium w-8 text-right pr-2">
+                      {val >= 1000000 ? `${(val / 1000000).toFixed(0)}jt` : val.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
 
-      const actualByYear = displayCandidates
-        .filter(c => c.tahapProses === 'hired' && c.tanggalHired)
-        .reduce((acc, c) => {
-          const y = new Date(c.tanggalHired).getFullYear();
-          acc[y] = (acc[y] || 0) + (c.expectedSalary || 0);
-          return acc;
-        }, {} as Record<number, number>);
+            {/* Bars Container */}
+            <div className="absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2">
+              {costHiringAggData.map((item) => {
+                const budgetHeight = (item.budget / maxAggVal) * 100;
+                const actualHeight = (item.actual / maxAggVal) * 100;
+                const isOver = item.actual > item.budget && item.budget > 0;
+                const variance = item.budget > 0 ? ((item.actual - item.budget) / item.budget * 100).toFixed(1) : null;
 
-      // Get unique years from both datasets
-      const allYearsSet = new Set([...Object.keys(budgetByYear), ...Object.keys(actualByYear)].map(Number));
-      let chartYears = Array.from(allYearsSet).sort((a, b) => a - b);
+                return (
+                  <div key={item.year} className="flex flex-col items-center gap-2 group relative flex-1 max-w-[80px]">
+                    {/* Tooltip on Hover */}
+                    <div className="absolute -top-28 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px]">
+                      <div className="font-bold mb-2 text-xs border-b border-slate-600 pb-1">Tahun {item.year}</div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <span className="text-slate-300">Budget:</span> <span className="text-right font-semibold">{formatIDR(item.budget)}</span>
+                        <span className="text-slate-300">Actual:</span> <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`}>{formatIDR(item.actual)}</span>
+                        <span className="text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1">Variance:</span>
+                        <span className={`col-span-2 text-right font-bold ${variance && Number(variance) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {variance !== null ? `${Number(variance) >= 0 ? '+' : ''}${variance}%` : '-'}
+                        </span>
+                      </div>
+                    </div>
 
-      // If filterYear is set, show only that year
-      if (filterYear !== 0) {
-        chartYears = chartYears.filter(y => y === filterYear);
-      }
+                    {/* The Bars */}
+                    <div className="flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1">
+                      {/* Budget Bar */}
+                      <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/bar">
+                        <div
+                          className="w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative"
+                          style={{ height: `${Math.max(budgetHeight, 2)}%` }}
+                        >
+                          {item.budget > 0 && (
+                            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap">
+                              {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-      // Build chart data array
-      const chartData = chartYears.map(year => ({
-        year,
-        budget: budgetByYear[year] || 0,
-        actual: actualByYear[year] || 0
-      }));
+                      {/* Actual Bar */}
+                      <div className="relative flex flex-col items-center justify-end h-full w-1/2 group/act">
+                        <div
+                          className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
+                          style={{ height: `${Math.max(actualHeight, 2)}%` }}
+                        >
+                          {item.actual > 0 && (
+                            <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-      const maxVal = Math.max(...chartData.flatMap(d => [d.budget, d.actual]), 1);
-
-      return chartData.length > 0 ? (
-         <div className= "relative h-64 w-full border-b border-l border-slate-200 pl-10 pb-2 " >
-          
-          {/* Y-Axis Labels */}
-           <div className= "absolute inset-0 flex flex-col justify-between pointer-events-none pr-2 " >
-            {[1, 0.75, 0.5, 0.25, 0].map((ratio) => {
-              const val = maxVal * ratio;
-              return (
-                 <div key={ratio} className= "border-t border-dashed border-slate-100 w-full h-0 relative flex items-center " >
-                   <span className= "absolute -left-10 text-[9px] text-slate-400 font-medium w-8 text-right pr-2 " >
-                    {val >= 1000000 ? `${(val / 1000000).toFixed(0)}jt` : val.toLocaleString('id-ID')}
-                   </span >
-                 </div >
-              );
-            })}
-           </div >
-
-          {/* Bars Container */}
-           <div className= "absolute inset-0 flex items-end justify-around gap-2 sm:gap-4 pl-2 " >
-            {chartData.map((item) => {
-              const budgetHeight = (item.budget / maxVal) * 100;
-              const actualHeight = (item.actual / maxVal) * 100;
-              const isOver = item.actual > item.budget && item.budget > 0;
-              const variance = item.budget > 0 ? ((item.actual - item.budget) / item.budget * 100).toFixed(1) : null;
-
-              return (
-                 <div key={item.year} className= "flex flex-col items-center gap-2 group relative flex-1 max-w-[80px] " >
-                  
-                  {/* Tooltip on Hover */}
-                   <div className= "absolute -top-28 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap min-w-[160px] " >
-                     <div className= "font-bold mb-2 text-xs border-b border-slate-600 pb-1 " >Tahun {item.year} </div >
-                     <div className= "grid grid-cols-2 gap-x-4 gap-y-1 " >
-                       <span className= "text-slate-300 " >Budget: </span >  <span className= "text-right font-semibold " >{formatIDR(item.budget)} </span >
-                       <span className= "text-slate-300 " >Actual: </span >  <span className={`text-right font-semibold ${isOver ? 'text-rose-300' : 'text-emerald-300'}`} >{formatIDR(item.actual)} </span >
-                       <span className= "text-slate-300 col-span-2 border-t border-slate-600 pt-1 mt-1 " >Variance: </span > 
-                       <span className={`col-span-2 text-right font-bold ${variance && Number(variance) >= 0 ? 'text-rose-400' : 'text-emerald-400'}`} >
-                        {variance !== null ? `${Number(variance) >= 0 ? '+' : ''}${variance}%` : '-'}
-                       </span >
-                     </div >
-                   </div >
-
-                  {/* The Bars */}
-                   <div className= "flex items-end gap-1 sm:gap-3 w-full justify-center h-full px-1 " >
-                    {/* Budget Bar */}
-                     <div className= "relative flex flex-col items-center justify-end h-full w-1/2 group/bar " >
-                       <div
-                        className= "w-full max-w-[30px] sm:max-w-[40px] bg-indigo-600 rounded-t-md transition-all duration-500 hover:bg-indigo-500 relative "
-                        style={{ height: `${Math.max(budgetHeight, 2)}%` }} // Min 2% height if exists
-                       >
-                         {/* Value Label on Top of Bar */}
-                         {item.budget > 0 && (
-                            <span className= "absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-indigo-600 whitespace-nowrap " >
-                             {item.budget >= 1000000 ? `${(item.budget/1000000).toFixed(1)}jt` : item.budget.toLocaleString('id-ID')}
-                            </span >
-                         )}
-                       </div >
-                     </div >
-
-                    {/* Actual Bar */}
-                     <div className= "relative flex flex-col items-center justify-end h-full w-1/2 group/act " >
-                       <div
-                        className={`w-full max-w-[30px] sm:max-w-[40px] rounded-t-md transition-all duration-500 relative ${isOver ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'}`}
-                        style={{ height: `${Math.max(actualHeight, 2)}%` }}
-                       >
-                         {/* Value Label on Top of Bar */}
-                         {item.actual > 0 && (
-                            <span className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${isOver ? 'text-rose-600' : 'text-emerald-600'}`} >
-                             {item.actual >= 1000000 ? `${(item.actual/1000000).toFixed(1)}jt` : item.actual.toLocaleString('id-ID')}
-                            </span >
-                         )}
-                       </div >
-                     </div >
-                   </div >
-
-                  {/* X-Axis Label */}
-                   <div className= "text-center mt-2 " >
-                     <span className= "text-xs font-bold text-slate-600 block " >{item.year} </span >
-                   </div >
-                 </div >
-              );
-            })}
-           </div >
-         </div >
-      ) : (
-         <div className= "h-40 flex flex-col items-center justify-center text-slate-400 gap-2 " >
-           <DollarSign className= "w-8 h-8 opacity-30 " / >
-           <p className= "text-sm font-medium " >Tidak ada data cost hiring untuk periode yang dipilih. </p >
-         </div >
-      );
-     })()}
-   </div >
+                    {/* X-Axis Label */}
+                    <div className="text-center mt-2">
+                      <span className="text-xs font-bold text-slate-600 block">{item.year}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
+            <DollarSign className="w-8 h-8 opacity-30" />
+            <p className="text-sm font-medium">Tidak ada data cost hiring untuk periode yang dipilih.</p>
+          </div>
+        )}
+      </div>
 
       {/* Recruitment Visualizations */}
       <RecruitmentCharts
