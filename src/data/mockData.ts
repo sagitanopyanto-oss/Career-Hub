@@ -758,3 +758,110 @@ export function getStoredData<T>(key: string, initial: T): T {
 export function setStoredData<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 🔹 TAHAP 1: ADMIN USER LOGIN SYSTEM
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Interface untuk user admin yang sedang login.
+ * Berbeda dari AdminRole (definisi role), AdminUser adalah instance user spesifik.
+ */
+export interface AdminUser {
+  id: string;
+  nama: string;
+  email: string;
+  roleId: string;       // Reference ke AdminRole.id
+  roleName: string;     // Denormalized untuk kemudahan akses
+  accessLevel: AdminRole['accessLevel'];
+  permissions: AdminRolePermissions;
+  avatar?: string;
+}
+
+/**
+ * Data login admin default.
+ * Password disimpan plain text karena ini frontend-only mock.
+ * Di production, gunakan hashing + backend auth.
+ */
+export const INITIAL_ADMIN_USERS: (AdminUser & { password: string })[] = [
+  {
+    id: 'USR-001',
+    nama: 'Budi Santoso',
+    email: 'budi@careerhub.co.id',
+    roleId: 'ROLE-001',
+    roleName: 'Super Admin',
+    accessLevel: 'Super Admin',
+    permissions: {
+      create: true, review: true, update: true, delete: true,
+      email: true, whatsapp: true, lockSettings: true, lockHistory: true
+    },
+    password: 'admin123'
+  },
+  {
+    id: 'USR-002',
+    nama: 'Amalia Putri',
+    email: 'amalia@careerhub.co.id',
+    roleId: 'ROLE-002',
+    roleName: 'Recruiter Lead',
+    accessLevel: 'HR Manager',
+    permissions: {
+      create: true, review: true, update: true, delete: false,
+      email: true, whatsapp: true, lockSettings: false, lockHistory: false
+    },
+    password: 'hr123'
+  },
+  {
+    id: 'USR-003',
+    nama: 'Yosef Wijaya',
+    email: 'yosef@careerhub.co.id',
+    roleId: 'ROLE-003',
+    roleName: 'Interview Panel',
+    accessLevel: 'Interviewer',
+    permissions: {
+      create: false, review: true, update: false, delete: false,
+      email: false, whatsapp: false, lockSettings: false, lockHistory: false
+    },
+    password: 'panel123'
+  }
+];
+
+/**
+ * Ambil data admin yang sedang login dari localStorage.
+ * Returns null jika belum ada yang login.
+ */
+export function getStoredAdmin(): AdminUser | null {
+  const raw = localStorage.getItem('careerhub_current_admin');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AdminUser;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Simpan data admin yang sedang login ke localStorage.
+ * Pass null untuk logout.
+ */
+export function setStoredAdmin(admin: AdminUser | null): void {
+  if (admin === null) {
+    localStorage.removeItem('careerhub_current_admin');
+  } else {
+    localStorage.setItem('careerhub_current_admin', JSON.stringify(admin));
+  }
+}
+
+/**
+ * Validasi kredensial login terhadap INITIAL_ADMIN_USERS.
+ * Returns AdminUser (tanpa password) jika valid, null jika tidak.
+ */
+export function validateAdminLogin(email: string, password: string): AdminUser | null {
+  const found = INITIAL_ADMIN_USERS.find(
+    u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password
+  );
+  if (!found) return null;
+
+  // Return tanpa field password untuk keamanan
+  const { password: _, ...safeUser } = found;
+  return safeUser;
+}
