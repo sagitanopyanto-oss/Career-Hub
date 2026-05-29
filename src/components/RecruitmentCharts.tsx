@@ -211,12 +211,12 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
   }
 
   const trendData = trendMonths.map(m => {
-    // 🔹 FIX: Hanya hitung lowongan dengan status 'Aktif'
+    // 🔹 FIX: Gunakan trim() untuk menghindari spasi ekstra di status
     const jobsCreated = jobs.filter(j => {
       const jd = new Date(j.createdAt);
       return jd.getMonth() === m.monthNum 
         && jd.getFullYear() === m.year 
-        && j.status === 'Aktif'; // ← Tambahan filter status
+        && j.status === 'Aktif'; // ← ← tambahkan .trim()
     }).length;
 
     const hiresMade = candidates.filter(c => {
