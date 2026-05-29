@@ -694,7 +694,14 @@ export function normalizeSettings(settings?: Partial<AppSettings> | null): AppSe
     targetSlaManagement: settings?.targetSlaManagement ?? INITIAL_SETTINGS.targetSlaManagement,
     targetSlaDays: settings?.targetSlaDays?.length ? settings.targetSlaDays : INITIAL_SETTINGS.targetSlaDays,
     budgetCostHiring: settings?.budgetCostHiring?.length ? settings.budgetCostHiring : INITIAL_SETTINGS.budgetCostHiring,
-    adminRoles: settings?.adminRoles?.length ? settings.adminRoles : INITIAL_SETTINGS.adminRoles,
+    // 🔹 PERBAIKAN: Pastikan adminRoles selalu merge dengan default (termasuk field email baru)
+    adminRoles: settings?.adminRoles?.length 
+      ? settings.adminRoles.map((role, idx) => ({
+          ...INITIAL_SETTINGS.adminRoles[idx],
+          ...role,
+          email: role.email || INITIAL_SETTINGS.adminRoles[idx]?.email || ''
+        }))
+      : INITIAL_SETTINGS.adminRoles,
     infoPortal: settings?.infoPortal ? settings.infoPortal : INITIAL_SETTINGS.infoPortal,
     emailSettings: settings?.emailSettings ? settings.emailSettings : INITIAL_SETTINGS.emailSettings,
     whatsappSettings: settings?.whatsappSettings ? settings.whatsappSettings : INITIAL_SETTINGS.whatsappSettings,
