@@ -21,15 +21,10 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  candidates,
-  jobs,
-  settings,
-  filterRange,
-  setFilterRange,
-  filterYear,
-  setFilterYear,
-  filterQuarters,
-  setFilterQuarters,
+  candidates, jobs, settings,
+  filterRange, setFilterRange,
+  filterYear, setFilterYear,
+  filterQuarters, setFilterQuarters,
   setActiveMenu
 }) => {
   const nowDate = new Date();
@@ -48,6 +43,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ].filter(Boolean) as number[])).sort((a, b) => b - a);
 
   const getQuarter = (date: Date) => Math.ceil((date.getMonth() + 1) / 4);
+
   const diffInDays = (d1: string, d2: string) => {
     if (!d1 || !d2) return 0;
     return Math.max(0, Math.floor((new Date(d1).getTime() - new Date(d2).getTime()) / (1000 * 60 * 60 * 24)));
@@ -65,21 +61,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return true;
   };
 
+  // FIXED: Strict filter logic for all combinations
   const isWithinFilterRange = (dateStr?: string) => {
     if (!dateStr) return false;
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return false;
-    if (filterQuarters.length > 0) return isWithinYearAndQuarter(dateStr);
+
+    // Priority 1: Quarter filter overrides range logic but respects year
+    if (filterQuarters.length > 0) {
+      return isWithinYearAndQuarter(dateStr);
+    }
+
+    // Priority 2: Year filter
     if (filterYear !== 0 && date.getFullYear() !== filterYear) return false;
 
+    // Priority 3: Range filter
     if (filterRange === 'month') {
       return date.getMonth() === nowDate.getMonth() && date.getFullYear() === nowDate.getFullYear();
     } else if (filterRange === '6months') {
       const sixMonthsAgo = new Date(nowDate);
       sixMonthsAgo.setMonth(nowDate.getMonth() - 6);
-      return date >= sixMonthsAgo;
+      return date >= sixMonthsAgo && date <= nowDate; // FIXED: Added upper bound
     }
-    return true; // annual or all years
+    // 'annual' or default: already filtered by year above
+    return true;
   };
 
   const toggleQuarter = (q: number) => {
@@ -118,7 +123,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     displayCandidates.forEach(c => {
       const startVal = (c as any)[stg.startKey];
       const endVal = (c as any)[stg.endKey];
-
       if (startVal && !isNaN(new Date(startVal).getTime())) {
         candidateCount++;
         if (endVal && !isNaN(new Date(endVal).getTime())) {
@@ -134,11 +138,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const rate = candidateCount > 0 ? Math.round((compliantCount / candidateCount) * 100) : 0;
     totalCompliant += compliantCount;
     totalViolation += violationCount;
-
     let status: 'OPTIMAL' | 'WARNING' | 'CRITICAL' = 'OPTIMAL';
     if (rate < 50) status = 'CRITICAL';
     else if (rate < 80) status = 'WARNING';
-
     return { stage: stg.label, targetDays, candidates: candidateCount, compliant: compliantCount, violation: violationCount, rate, status };
   });
 
@@ -155,12 +157,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const avgTargetSla = safeSettings.targetSlaDays.reduce((sum, s) => sum + s.targetDays, 0) / (safeSettings.targetSlaDays.length || 1);
   const slaGoalPercent = safeSettings.targetSlaManagement ?? 85;
 
-  // Recent Applicants
   const recentApplicants = [...displayCandidates]
     .sort((a, b) => new Date(b.tanggalApplied).getTime() - new Date(a.tanggalApplied).getTime())
     .slice(0, 5);
 
-  // --- NEW: AGGREGATE COST HIRING CHART DATA ---
+  // Aggregate Cost Hiring Chart Data
   const totalBudget = safeBudgets
     .filter(b => filterYear === 0 ? true : b.year === filterYear)
     .reduce((sum, b) => sum + b.budget, 0);
@@ -175,7 +176,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return `Rp ${val.toLocaleString('id-ID')}`;
   };
 
-  // --- NEW: PIPELINE TAHAP REKRUTMEN DATA ---
+  // Pipeline Tahap Rekrutmen Data
   const pipelineData = [
     { label: 'Applied', count: displayCandidates.filter(c => c.tahapProses === 'applied').length, color: 'bg-blue-500' },
     { label: 'Screening', count: displayCandidates.filter(c => c.tahapProses === 'screening').length, color: 'bg-indigo-500' },
@@ -304,7 +305,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-[11px] text-slate-400 mt-1">Total tahapan proses yang memenuhi target waktu.</p>
           </div>
         </div>
-
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4">
           <div className="p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 shrink-0"><Clock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
           <div className="min-w-0">
@@ -315,7 +315,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-[11px] text-slate-400 mt-1">Rata-rata waktu proses apply hingga tanda tangan kontrak.</p>
           </div>
         </div>
-
         <div className="bg-white rounded-xl border border-slate-100 p-4 sm:p-5 shadow-sm flex items-center gap-3 sm:gap-4 sm:col-span-2 lg:col-span-1">
           <div className="p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 shrink-0"><CalendarClock className="w-6 h-6 sm:w-7 sm:h-7" /></div>
           <div className="min-w-0">
@@ -328,7 +327,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 🔹 NEW: AGGREGATE COST HIRING CHART */}
+      {/* Aggregate Cost Hiring Chart */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -345,7 +344,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Actual</span>
           </div>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
           <div className="p-4 bg-slate-50 rounded-lg">
             <span className="text-xs text-slate-500 font-bold uppercase">Total Budget</span>
@@ -369,7 +367,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Recruitment Visualizations */}
-      <RecruitmentCharts 
+      <RecruitmentCharts
         candidates={displayCandidates}
         jobs={filteredJobs}
         settings={safeSettings}
@@ -378,7 +376,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         filterQuarters={filterQuarters}
       />
 
-      {/* 🔹 NEW: PIPELINE TAHAP REKRUTMEN CHART */}
+      {/* Pipeline Tahap Rekrutmen Chart */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -389,7 +387,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ✓ {filterRange === 'month' ? 'Bulan Ini' : filterRange === '6months' ? '6 Bulan' : 'Tahunan'}
           </span>
         </div>
-
         <div className="space-y-3">
           {pipelineData.map((item, idx) => (
             <div key={idx} className="space-y-1">
@@ -398,10 +395,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-slate-500">{item.count} Kandidat</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                <div 
-                  className={`h-2.5 rounded-full ${item.color}`}
-                  style={{ width: `${(item.count / maxPipelineVal) * 100}%` }}
-                ></div>
+                <div className={`h-2.5 rounded-full ${item.color}`} style={{ width: `${(item.count / maxPipelineVal) * 100}%` }}></div>
               </div>
             </div>
           ))}
@@ -500,14 +494,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {recentApplicants.map((cand) => {
                 const getStatusBadge = (tahap: string) => {
                   const colors: Record<string, string> = {
-                    applied: 'bg-blue-100 text-blue-800',
-                    screening: 'bg-indigo-100 text-indigo-800',
-                    interview: 'bg-purple-100 text-purple-800',
-                    assessment: 'bg-pink-100 text-pink-800',
-                    medical: 'bg-amber-100 text-amber-800',
-                    offering: 'bg-teal-100 text-teal-800',
-                    hired: 'bg-emerald-100 text-emerald-800',
-                    rejected: 'bg-rose-100 text-rose-800'
+                    applied: 'bg-blue-100 text-blue-800', screening: 'bg-indigo-100 text-indigo-800',
+                    interview: 'bg-purple-100 text-purple-800', assessment: 'bg-pink-100 text-pink-800',
+                    medical: 'bg-amber-100 text-amber-800', offering: 'bg-teal-100 text-teal-800',
+                    hired: 'bg-emerald-100 text-emerald-800', rejected: 'bg-rose-100 text-rose-800'
                   };
                   return (<span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${colors[tahap] || 'bg-slate-100 text-slate-800'}`}>{tahap === 'medical' ? 'Medical Check' : tahap}</span>);
                 };
@@ -518,12 +508,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 };
                 return (
                   <tr key={cand.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-800">{cand.nama}</span>
-                        <span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span>
-                      </div>
-                    </td>
+                    <td className="p-4"><div className="flex flex-col"><span className="font-bold text-slate-800">{cand.nama}</span><span className="text-[10px] text-slate-400 font-semibold">{cand.id}</span></div></td>
                     <td className="p-4 font-medium text-slate-700">{cand.posisiDilamar}</td>
                     <td className="p-4 text-slate-500">{cand.pendidikan} - {cand.jurusan}</td>
                     <td className="p-4">{getMatchBadge(cand.ratingKecocokan)}</td>
