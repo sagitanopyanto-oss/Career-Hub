@@ -14,7 +14,9 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
   candidates,
   jobs,
   settings,
+  filterRange,
   filterYear,
+  filterQuarters,
 }) => {
 
   // --- HELPER: Get Unique Departments & Aggregate Data ---
@@ -45,21 +47,26 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     // 3. Ambil nama departemen unik
     const uniqueDepts = Array.from(new Set(relevantBudgets.map(b => b.department))).sort();
 
-    // 4. Hitung Cost Hiring Data (Actual)
+    // 4. Hitung Cost Hiring Data (Actual) - SYNCED WITH GLOBAL FILTER
     const costData = uniqueDepts.map(dept => {
       // Find aggregated or single-year budget
       const budgetEntry = relevantBudgets.find(b => b.department === dept);
       const budget = budgetEntry ? budgetEntry.budget : 0;
 
       // Calculate Actual Spending for this dept
-      // If filterYear is 0, sum all hired candidates regardless of year. 
-      // If specific year, only sum those hired in that year.
+      // IMPORTANT: Filter candidates based on Global Filter (Year/Range)
       const actual = candidates
         .filter(c => 
           c.tahapProses === 'hired' && 
           c.tanggalHired &&
+          // Apply Year Filter
           (filterYear === 0 ? true : new Date(c.tanggalHired).getFullYear() === filterYear) &&
-          // Improved Matching Logic: Case Insensitive & Partial Match
+          // Apply Range Filter (Optional: usually Cost Hiring is viewed by Year, but we respect it)
+          // For simplicity in Cost Hiring, we primarily respect the Year filter. 
+          // If you want strict range adherence, uncomment below:
+          // (filterRange === 'month' ? (new Date(c.tanggalHired).getMonth() === new Date().getMonth()) : true) &&
+          
+          // Match Department Name (Case Insensitive)
           (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
         )
         .reduce((sum, c) => sum + (c.expectedSalary || 0), 0);
@@ -87,11 +94,12 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     ).length;
 
     // Count Hired Candidates for this dept in current filter context
-    // IMPROVED MATCHING LOGIC
+    // FIX: Ensure we filter by Year/Range to sync with dashboard
     const hiredCands = candidates.filter(c => 
       c.tahapProses === 'hired' &&
+      // Apply Year Filter
       (filterYear === 0 ? true : new Date(c.tanggalHired!).getFullYear() === filterYear) &&
-      // Check if job title contains dept name OR dept name contains job title (Case Insensitive)
+      // Match Department Name (Case Insensitive)
       (c.posisiDilamar.toLowerCase().includes(dept.toLowerCase()) || 
        dept.toLowerCase().includes(c.posisiDilamar.toLowerCase()))
     ).length;
@@ -99,13 +107,20 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
     return { department: dept, open: openJobs, hired: hiredCands };
   });
 
-  // --- CHART 3: Tren Lowongan vs Rekrutmen (Dynamic Range) ---
+  // --- CHART 3: Tren Lowongan vs Rekrutmen (DYNAMIC RANGE) ---
   const nowDate = new Date();
-  
-  // Determine months to show based on Filter Year
   let trendMonths = [];
-  if (filterYear === 0) {
-    // If "All Years", show last 6 months relative to today
+
+  // Determine months to show based on Filter Range & Year
+  if (filterRange === 'month') {
+    // Show only current month
+    trendMonths.push({
+      month: nowDate.toLocaleString('id-ID', { month: 'short', year: '2-digit' }),
+      monthNum: nowDate.getMonth(),
+      year: nowDate.getFullYear()
+    });
+  } else if (filterRange === '6months') {
+    // Show last 6 months relative to today
     for (let i = 5; i >= 0; i--) {
       const d = new Date(nowDate.getFullYear(), nowDate.getMonth() - i, 1);
       trendMonths.push({
@@ -115,13 +130,14 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
       });
     }
   } else {
-    // If Specific Year (e.g., 2025), show ALL 12 months of that year
+    // Annual: Show all 12 months of the selected year (or current year if "All Years")
+    const targetYear = filterYear === 0 ? nowDate.getFullYear() : filterYear;
     for (let m = 0; m < 12; m++) {
-      const d = new Date(filterYear, m, 1);
+      const d = new Date(targetYear, m, 1);
       trendMonths.push({
         month: d.toLocaleString('id-ID', { month: 'short' }),
         monthNum: m,
-        year: filterYear
+        year: targetYear
       });
     }
   }
@@ -196,7 +212,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
         </div>
       </div>
 
-      {/* CHART 2: Cost Hiring per Departemen (FIXED VISUALIZATION) */}
+      {/* CHART 2: Cost Hiring per Departemen */}
       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -256,7 +272,7 @@ export const RecruitmentCharts: React.FC<RecruitmentChartsProps> = ({
           <div>
             <h3 className="font-bold text-slate-800 text-sm sm:text-base">Tren Lowongan vs Rekrutmen</h3>
             <p className="text-slate-400 text-[11px] sm:text-xs">
-              {filterYear === 0 ? 'Statistik 6 Bulan Terakhir' : `Statistik Bulanan Tahun ${filterYear}`}
+              {filterRange === 'month' ? 'Statistik Bulan Ini' : filterRange === '6months' ? 'Statistik 6 Bulan Terakhir' : `Statistik Bulanan Tahun ${filterYear === 0 ? nowDate.getFullYear() : filterYear}`}
             </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-bold">
