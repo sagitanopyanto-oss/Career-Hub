@@ -612,6 +612,7 @@ export const INITIAL_SETTINGS: AppSettings = {
     {
       id: 'ROLE-001',
       roleName: 'Super Admin',
+      email: 'superadmin@careerhub.co.id', // 🔹 BARU
       accessLevel: 'Super Admin',
       status: 'Active',
       description: 'Akses penuh untuk seluruh menu, pengaturan, dan audit log.',
@@ -621,6 +622,7 @@ export const INITIAL_SETTINGS: AppSettings = {
     {
       id: 'ROLE-002',
       roleName: 'Recruiter Lead',
+      email: 'recruiter.lead@careerhub.co.id', // 🔹 BARU
       accessLevel: 'HR Manager',
       status: 'Active',
       description: 'Mengelola lowongan, kandidat, dan persetujuan tahap rekrutmen.',
@@ -630,6 +632,7 @@ export const INITIAL_SETTINGS: AppSettings = {
     {
       id: 'ROLE-003',
       roleName: 'Interview Panel',
+      email: 'interview.panel@careerhub.co.id', // 🔹 BARU
       accessLevel: 'Interviewer',
       status: 'Active',
       description: 'Melihat kandidat, jadwal interview, dan memberi penilaian interview.',
