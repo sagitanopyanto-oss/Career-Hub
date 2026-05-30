@@ -525,7 +525,6 @@ startxref
                         {s}
                       </span>
                     )) : (
-              
               {matchedSkills.length === 0 && (
                 <span className="text-slate-400 text-xs italic">Tidak ada keahlian yang terdeteksi cocok.</span>
               )}
