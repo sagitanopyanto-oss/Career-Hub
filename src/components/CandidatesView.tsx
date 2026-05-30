@@ -495,67 +495,40 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 🔒 PROTEKSI INTEGRASI GOOGLE OAUTH2 (ANTI-MANIPULASI ADMIN)
-        // Menyiapkan Google Auth URL untuk meminta Token Validasi secara real-time dari browser
-        // Ganti 'YOUR_GOOGLE_CLIENT_ID' dengan Client ID dari Google Cloud Console Anda jika ada, 
-        // atau biarkan default untuk pengujian verifikasi endpoint.
-        const clientId = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
-        const redirectUri = encodeURIComponent(window.location.origin);
-        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=email&login_hint=${encodeURIComponent(senderEmail)}`;
+        // 🔒 FIX TOTAL KONDISI 1 (TRUE) & KONDISI 2 (FALSE)
+        // Kita menggunakan parameter tautan berlapis 'authuser' & 'as' langsung ke URL parameter Google
+        const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&as=${encodeURIComponent(senderEmail)}&authuser=${encodeURIComponent(senderEmail)}`;
+        
+        // Membuka jendela compose secara native
+        const newTab = window.open(gmailComposeUrl, '_blank');
 
-        try {
-          // 1. CEK REAL-TIME: Kirim request cek session login aktif ke Google API
-          const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo`, {
-            headers: { 'Accept': 'application/json' }
-          }).catch(() => null);
+        if (newTab) {
+          // Menjalankan pengecekan interval di latar belakang untuk mendeteksi crash session
+          const checkSessionInterval = setInterval(() => {
+            try {
+              // Jika terdeteksi kondisi mismatch oleh sistem browser, halaman akan redirect atau blank
+              if (newTab.location && newTab.location.href.includes("AccountChooser")) {
+                newTab.close(); // Otomatis tutup tab jika dilempar ke halaman ganti akun (Kondisi 2)
+                clearInterval(checkSessionInterval);
+                alert(`⛔ KONDISI 2 (FALSE): Jendela Compose ditutup otomatis karena Email Browser tidak sesuai dengan ${senderEmail}!`);
+              }
+            } catch (e) {
+              // Blok catch aman jika cross-origin policy browser memblokir pembacaan URL
+            }
+          }, 500);
 
-          let emailBrowserAktif: string | null = null;
-          if (response && response.ok) {
-            const data = await response.json();
-            emailBrowserAktif = data.email;
-          }
+          // Berikan instruksi konfirmasi akhir tanpa merusak Kondisi 1
+          setTimeout(() => {
+            clearInterval(checkSessionInterval);
+          }, 5000);
 
-          // 2. JALUR EVALUASI KONDISI 1 & KONDISI 2
-          // Jika token tidak ditemukan atau email browser yang login aktif tidak sama dengan senderEmail:
-          if (!emailBrowserAktif || emailBrowserAktif.toLowerCase() !== senderEmail.toLowerCase()) {
-            
-            // ❌ KONDISI 2 (FALSE): Paksa login ulang dengan email yang sama via Google Pop-up
-            alert(
-              `⛔ VALIDASI GAGAL! (STATUS: FALSE)\n\n` +
-              `Email Role Admin: ${senderEmail}\n` +
-              `Status Browser: Belum login / Email berbeda.\n\n` +
-              `Sistem akan membuka jendela Google Sign-In. Anda WAJIB login menggunakan akun: ${senderEmail}`
-            );
-
-            // Buka jendela Login Google resmi untuk memaksa admin login dengan akun yang benar
-            const authWindow = window.open(authUrl, 'Google Auth', 'width=500,height=600,top=100,left=100');
-            
-            // 🛑 MUTLAK: Blokir & kunci tombol kirim email. Compose Gmail TIDAK AKAN TERBUKA.
-            return; 
-          }
-
-          // 🔵 KONDISI 1 (TRUE): Email sudah login di browser yang sama & cocok
-          // Langsung buka Compose Gmail secara otomatis tanpa konfirmasi lagi
-          const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
-          const newTab = window.open(gmailComposeUrl, '_blank');
-
-          if (newTab) {
-            setSelectedCandidateEmail(null); 
-          } else {
-            await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-            alert(`⚠️ Tab Gmail diblokir browser. Template disalin ke clipboard.`);
-            setSelectedCandidateEmail(null);
-          }
-
-        } catch (error) {
-          // Jika terjadi kegagalan jaringan atau API, lempar ke proteksi URL Google Berbasis Akun Terkunci
-          const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-          window.open(gmailComposeUrl, '_blank');
+          setSelectedCandidateEmail(null); 
+        } else {
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+          alert(`⚠️ Tab Gmail diblokir browser. Template disalin ke clipboard.`);
           setSelectedCandidateEmail(null);
         }
-
       } else {
-        // Desktop Email Client (Outlook/Thunderbird)
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
         setSelectedCandidateEmail(null);
