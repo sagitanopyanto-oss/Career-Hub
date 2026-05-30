@@ -485,7 +485,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
+      const isGmailWeb = /gmail\.com|googlemail\.com/i.test(senderEmail);
       let isGoogleLoggedIn = false;
       try {
         const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
