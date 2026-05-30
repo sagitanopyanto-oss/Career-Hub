@@ -481,9 +481,31 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
 
     // 🔹 PERBAIKAN LOGIKA VALIDASI EMAIL PENGGIRIM
     const handleSendEmail = async () => {
-      const subject = replacedSubject;
-      const body = replacedBody;
-      const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
+      // 🔒 KUNCI UTAMA: Ambil username sebelum tanda '@' untuk dijadikan kunci rahasia
+      const emailUserSecret = senderEmail.split('@')[0].toLowerCase();
+
+      const inputVerifikasi = prompt(
+        `[VERIFIKASI KEAMANAN EMAIL]\n\n` +
+        `Sistem mendeteksi Email Role Admin: ${senderEmail}\n` +
+        `Ketik BARIS DEPAN email tersebut (sebelum tanda @) untuk menyinkronkan browser:`
+      );
+
+      // Jalur Penentu Kondisi 1 dan Kondisi 2
+      const isMatch = inputVerifikasi && inputVerifikasi.trim().toLowerCase() === emailUserSecret;
+
+      // KONDISI 1 (TRUE): Jika input cocok, email diisi normal
+      // KONDISI 2 (FALSE): Jika input salah/asal klik OK, subjek & body dihancurkan (kosong/error)
+      const subject = isMatch ? replacedSubject : "ERROR: AKUN TIDAK SINKRON";
+      const body = isMatch ? replacedBody : "Sistem memblokir pesan ini karena Email Role Admin dan Email Browser Anda TIDAK COCOK. Silakan tutup tab ini.";
+
+      if (!isMatch) {
+        // Peringatan Kondisi 2 langsung dimunculkan
+        alert(
+          `⛔ VALIDASI GAGAL (STATUS: FALSE)\n\n` +
+          `Sebab: Anda memasukkan kunci yang salah atau asal klik OK.\n` +
+          `Tindakan: Fitur auto-fill Gmail dihancurkan demi keamanan data.`
+        );
+      }
 
       const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
       let isGoogleLoggedIn = false;
@@ -495,22 +517,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 🔒 SISTEM PENGUNCI SESSION GOOGLE (ANTI-MANIPULASI ADMIN)
-        // Kita tidak memakai prompt teks lagi. Kita serahkan verifikasi ke server Google Mail.
-        // Parameter 'authuser' dipaksa diisi dengan Email Role Admin.
-        const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
+        // Tautan dikunci dengan parameter authuser dan konten yang sudah di-filter di atas
+        const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${isMatch ? encodeURIComponent(cand.email) : ''}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
         
-        // Langsung buka tab baru tanpa interupsi pop-up web kita
-        const newTab = window.open(gmailComposeUrl, '_blank');
-
-        if (newTab) {
-          setSelectedCandidateEmail(null); 
-        } else {
-          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(`⚠️ Tab Gmail diblokir browser. Template disalin ke clipboard.`);
-          setSelectedCandidateEmail(null);
-        }
+        window.open(gmailComposeUrl, '_blank');
+        setSelectedCandidateEmail(null); 
       } else {
+        if (!isMatch) return; // Jika desktop client dan salah, blokir total
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
         setSelectedCandidateEmail(null);
