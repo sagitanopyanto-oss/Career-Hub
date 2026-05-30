@@ -485,7 +485,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // 1. Deteksi apakah browser sedang login Gmail
       const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
       let isGoogleLoggedIn = false;
       try {
@@ -496,44 +495,25 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 2. VALIDASI KETAT: Cek apakah Email Role Admin adalah Gmail
-        const isAdminEmailGmail = /gmail\.com|googlemail\.com/i.test(senderEmail);
-
-        if (!isAdminEmailGmail) {
-          // KASUS FALSE: Email Role BUKAN Gmail, tapi Browser pakai Gmail -> BLOCK!
-          alert(
-            `⛔ GAGAL MENGIRIM EMAIL\n\n` +
-            `Email Role Admin Anda: ${senderEmail}\n` +
-            `Akun Gmail Terdeteksi di Browser: YA\n\n` +
-            `Sistem memblokir pengiriman karena ketidakcocokan akun.\n` +
-            `Silakan:\n` +
-            `1. Login ke browser menggunakan akun: ${senderEmail}\n` +
-            `2. Atau ubah Email Role Admin di Pengaturan menjadi akun Gmail yang sedang aktif.`
-          );
-          return; // HENTIKAN PROSES, JANGAN BUKA TAB
-        }
-
-        // KASUS TRUE: Email Role ADALAH Gmail -> Lanjut buka Gmail Compose
-        const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        // 🔒 OTOMATISASI FIX KONDISI 1 & 2: 
+        // Menggunakan path /u/{email_admin}/ untuk memaksa Google melakukan validasi akun di browser.
+        const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
         const newTab = window.open(gmailComposeUrl, '_blank');
 
         if (newTab) {
-          alert(`✅ Gmail Compose terbuka di tab baru!\n\n📎 Lampiran harus dilampirkan MANUAL:\n1. Klik ikon 📎 (Attach files) di Gmail\n2. Pilih file CV/dokumen dari komputer Anda\n\n💡 Tip: Gunakan tombol "Download CV" di tabel kandidat sebelum mengirim email.`);
+          // Sistem berhasil melempar perintah ke browser
+          setSelectedCandidateEmail(null); 
         } else {
           await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(`⚠️ Tab Gmail diblokir.\n\nTemplate SUDAH DISALIN ke clipboard.\nSilakan buka Gmail manual dan Paste (Ctrl+V).`);
+          alert(`⚠️ Tab Gmail diblokir oleh browser. Template disalin ke clipboard.`);
+          setSelectedCandidateEmail(null);
         }
       } else {
-        // DESKTOP EMAIL CLIENT (Outlook/Thunderbird)
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
-
-        setTimeout(async () => {
-          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(`📧 Email Desktop Terdeteksi\n\nTemplate SUDAH DISALIN ke clipboard (Ctrl+V sebagai backup).\n📎 Lampirkan file secara manual setelah email terbuka.`);
-        }, 800);
+        setSelectedCandidateEmail(null);
       }
-      setSelectedCandidateEmail(null);
     };
 
     return (
