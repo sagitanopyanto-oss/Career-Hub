@@ -17,6 +17,7 @@ import {
   getStoredAdmin,
   setStoredAdmin,
   validateAdminLogin,
+  INITIAL_ADMIN_USERS, // Penting untuk login fallback
 } from './data/mockData';
 import { Sidebar } from './components/Sidebar';
 import { InfoPortalView } from './components/InfoPortalView';
@@ -55,15 +56,15 @@ export default function App() {
   const [filterYear, setFilterYear] = useState<number>(2025);
   const [filterQuarters, setFilterQuarters] = useState<number[]>([]);
 
-  // 🔹 TAHAP 2: Login state dengan AdminUser (bukan hanya AdminRole)
+  // 🔹 TAHAP 2: Login state dengan AdminUser
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() =>
     getStoredData<boolean>('careerhub_is_logged_in', false)
   );
   const [currentRole, setCurrentRole] = useState<AdminRole | null>(() =>
     getStoredData<AdminRole | null>('careerhub_current_role', null)
   );
-
-  // 🔹 TAHAP 2: State baru untuk user spesifik yang login
+  
+  // 🔹 State baru untuk user spesifik yang login
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() =>
     getStoredAdmin()
   );
@@ -74,62 +75,15 @@ export default function App() {
   useEffect(() => {
     setStoredData('careerhub_is_logged_in', isLoggedIn);
   }, [isLoggedIn]);
-
+  
   useEffect(() => {
     setStoredData('careerhub_current_role', currentRole);
   }, [currentRole]);
 
-  // 🔹 TAHAP 2: Sync currentUser ke localStorage via helper
+  // 🔹 Sync currentUser ke localStorage via helper
   useEffect(() => {
     setStoredAdmin(currentUser);
   }, [currentUser]);
-
-  // 🔹 FIX BARU: Sinkronkan currentUser dengan settings.adminRoles secara real-time
-  // Jika email role diubah di Settings, updateUser session agar tidak perlu logout/login ulang
-  useEffect(() => {
-    if (!currentUser || !currentRole) return;
-
-    // Cari role terbaru dari settings berdasarkan roleId user yang login
-    const updatedRole = settings.adminRoles.find(r => r.id === currentRole.id);
-
-    if (updatedRole) {
-      // Cek apakah email atau nama role berubah
-      if (updatedRole.email !== currentUser.email || updatedRole.roleName !== currentUser.roleName) {
-        // Update currentUser dengan data terbaru
-        const updatedUser: AdminUser = {
-          ...currentUser,
-          email: updatedRole.email,
-          roleName: updatedRole.roleName,
-          accessLevel: updatedRole.accessLevel,
-          permissions: updatedRole.permissions
-        };
-
-        setCurrentUser(updatedUser);
-        setStoredAdmin(updatedUser); // Simpan ke localStorage
-        
-        console.log(`[SYNC] User ${currentUser.nama} synced with new email: ${updatedRole.email}`);
-      }
-    }
-  }, [settings.adminRoles, currentUser, currentRole]);
-
-  // 🔹 TAHAP 2: handleLogin sekarang menerima AdminUser
-  const handleLogin = (user: AdminUser) => {
-    setIsLoggedIn(true);
-    setCurrentUser(user);
-    // Cari role yang sesuai dari settings untuk backward compatibility
-    const matchedRole = settings.adminRoles.find(r => r.id === user.roleId) || null;
-    setCurrentRole(matchedRole);
-    addLog('LOGIN', 'System', `${user.nama} (${user.roleName})`, `User ${user.email} berhasil login dengan role ${user.roleName}.`);
-  };
-
-  const handleLogout = () => {
-    addLog('LOGOUT', 'System', `${currentUser?.nama || currentRole?.roleName || 'Unknown'}`, `User logout dari sistem.`);
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    setCurrentRole(null);
-    setActiveMenu('portal');
-    setIsNotificationOpen(false);
-  };
 
   // Core Database States
   const [jobs, setJobs] = useState<Job[]>(() =>
@@ -141,9 +95,12 @@ export default function App() {
   const [schedules, setSchedules] = useState<InterviewSchedule[]>(() =>
     getStoredData<InterviewSchedule[]>('careerhub_interviews', INITIAL_INTERVIEWS)
   );
+  
+  // Inisialisasi Settings
   const [settings, setSettings] = useState<AppSettings>(() =>
     normalizeSettings(getStoredData<AppSettings>('careerhub_settings', INITIAL_SETTINGS))
   );
+  
   const [logs, setLogs] = useState<HistoryLog[]>(() =>
     getStoredData<HistoryLog[]>('careerhub_history', INITIAL_HISTORY)
   );
@@ -170,7 +127,7 @@ export default function App() {
 
   const activeNotifications = logs.filter(log => !dismissedNotificationIds.includes(log.id));
 
-  // Logging Helper — 🔹 TAHAP 2: Gunakan currentUser.nama jika tersedia
+  // Logging Helper — Gunakan currentUser.nama jika tersedia
   const addLog = (action: string, menu: string, itemAffected: string, details: string) => {
     const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const newLog: HistoryLog = {
@@ -185,6 +142,56 @@ export default function App() {
     setLogs(prev => [newLog, ...prev]);
   };
 
+  // ─── FIX BARU: Sinkronkan currentUser dengan settings.adminRoles secara real-time ──────────────────────
+  // Ini memastikan jika email role diubah di Settings, tampilan Header & Email Modal ikut berubah tanpa refresh
+  useEffect(() => {
+    if (!currentUser || !currentRole || !settings.adminRoles) return;
+
+    // Cari role terbaru dari settings berdasarkan roleId user yang login
+    const updatedRole = settings.adminRoles.find(r => r.id === currentRole.id);
+
+    if (updatedRole) {
+      // Cek apakah email atau nama role berubah
+      if (updatedRole.email !== currentUser.email || updatedRole.roleName !== currentUser.roleName) {
+        // Update currentUser dengan data terbaru
+        const updatedUser: AdminUser = {
+          ...currentUser,
+          email: updatedRole.email,
+          roleName: updatedRole.roleName,
+          accessLevel: updatedRole.accessLevel,
+          permissions: updatedRole.permissions
+        };
+        
+        setCurrentUser(updatedUser);
+        setStoredAdmin(updatedUser); // Simpan ke localStorage
+        
+        console.log(`[SYNC] User ${currentUser.nama} synced with new email: ${updatedRole.email}`);
+      }
+    }
+  }, [settings.adminRoles, currentUser, currentRole]);
+  // ────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  // 🔹 handleLogin sekarang menerima AdminUser
+  const handleLogin = (user: AdminUser) => {
+    setIsLoggedIn(true);
+    setCurrentUser(user);
+    
+    // Cari role yang sesuai dari settings untuk backward compatibility
+    const matchedRole = settings.adminRoles.find(r => r.id === user.roleId) || null;
+    setCurrentRole(matchedRole);
+    
+    addLog('LOGIN', 'System', `${user.nama} (${user.roleName})`, `User ${user.email} berhasil login dengan role ${user.roleName}.`);
+  };
+
+  const handleLogout = () => {
+    addLog('LOGOUT', 'System', `${currentUser?.nama || currentRole?.roleName || 'Unknown'}`, `User logout dari sistem.`);
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setCurrentRole(null);
+    setActiveMenu('portal');
+    setIsNotificationOpen(false);
+  };
+
   // ─── Permission-checked CRUD helpers ────────────────────────────────────────
   const handleAddJob = (job: Job) => {
     if (!canCreate(currentRole)) { permissionDenied('membuat lowongan baru'); return; }
@@ -194,7 +201,7 @@ export default function App() {
   const handleUpdateJob = (updatedJob: Job) => {
     if (!canUpdate(currentRole)) { permissionDenied('mengubah data lowongan'); return; }
     setJobs(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
-    addLog('UPDATE', 'Portal Lowongan', `${updatedJob.id} - ${updatedJob.judul}`, `Memperbarui detail lowongan pekerjaan (Gaji: ${updatedJob.hideSalary ? 'Hidden' : 'Show'}, Status: ${updatedJob.status}).`);
+    addLog('UPDATE', 'Portal Lowongan', `${updatedJob.id} - ${updatedJob.judul}`, `Memperbarui detail lowongan pekerjaan.`);
   };
   const handleDeleteJob = (id: string) => {
     if (!canDelete(currentRole)) { permissionDenied('menghapus lowongan'); return; }
@@ -207,36 +214,23 @@ export default function App() {
   // CANDIDATE ACTIONS
   const handleAddCandidate = (cand: Candidate) => {
     if (!canCreate(currentRole)) { permissionDenied('mendaftarkan kandidat baru'); return; }
-    // 🔹 PERBAIKAN: Hitung Ulang Skor ATS Jika 0 (Dari Portal Publik)
     let finalRating = cand.ratingKecocokan;
-    // Jika skor 0 (biasanya dari form publik), lakukan simulasi sederhana
     if (finalRating === 0) {
-      const expScore = Math.min(cand.pengalaman * 5, 40); // Max 40 poin dari pengalaman
+      const expScore = Math.min(cand.pengalaman * 5, 40);
       let eduScore = 0;
       if (cand.pendidikan === 'S2') eduScore = 30;
       else if (cand.pendidikan === 'S1') eduScore = 20;
       else if (cand.pendidikan === 'D3') eduScore = 10;
-
-      // Base score 30 + Exp + Edu
       finalRating = Math.min(100, 30 + expScore + eduScore);
     }
-
-    const processedCand: Candidate = {
-      ...cand,
-      ratingKecocokan: finalRating,
-    };
-
+    const processedCand: Candidate = { ...cand, ratingKecocokan: finalRating };
     setCandidates(prev => [processedCand, ...prev]);
-
     const threshold = settings.autoScreeningATS;
     const isAutoPassed = processedCand.ratingKecocokan >= threshold;
-
     const atsDetails = isAutoPassed
       ? `Skor ATS ${processedCand.ratingKecocokan}% melampaui batas minimum ${threshold}%. Rekomendasi: AUTO-PASS.`
       : `Skor ATS ${processedCand.ratingKecocokan}% di bawah batas minimum ${threshold}%. Rekomendasi: REVIEW MANUAL.`;
-
     addLog('CREATE', 'Kandidat', `${processedCand.id} - ${processedCand.nama}`, `Mendaftarkan pelamar baru untuk posisi ${processedCand.posisiDilamar}.`);
-
     setTimeout(() => {
       addLog('AUTO-SCREENING', 'Kandidat', `${processedCand.id} - ${processedCand.nama}`, `Pemindaian CV otomatis oleh ATS. ${atsDetails}`);
     }, 400);
@@ -246,8 +240,8 @@ export default function App() {
     const originalCand = candidates.find(c => c.id === updatedCand.id);
     const stageChanged = originalCand && originalCand.tahapProses !== updatedCand.tahapProses;
     setCandidates(prev => prev.map(c => c.id === updatedCand.id ? updatedCand : c));
-    let logMsg = `Memperbarui data kandidat (Pendidikan: ${updatedCand.pendidikan}, Expected Salary: ${updatedCand.expectedSalary}).`;
-    if (stageChanged) logMsg = `Transisi Tahapan Rekrutmen: Mengubah tahap dari '${originalCand?.tahapProses}' menjadi '${updatedCand.tahapProses}'.`;
+    let logMsg = `Memperbarui data kandidat.`;
+    if (stageChanged) logMsg = `Transisi Tahapan Rekrutmen: '${originalCand?.tahapProses}' menjadi '${updatedCand.tahapProses}'.`;
     addLog('UPDATE', 'Kandidat', `${updatedCand.id} - ${updatedCand.nama}`, logMsg);
   };
   const handleDeleteCandidate = (id: string) => {
@@ -262,29 +256,29 @@ export default function App() {
   const handleAddSchedule = (sched: InterviewSchedule) => {
     if (!canCreate(currentRole)) { permissionDenied('membuat jadwal interview baru'); return; }
     setSchedules(prev => [sched, ...prev]);
-    addLog('CREATE', 'Schedule Interview', `${sched.id} - ${sched.nama}`, `Menjadwalkan interview (${sched.type} - ${sched.method}) dengan interviewer ${sched.interviewer}.`);
+    addLog('CREATE', 'Schedule Interview', `${sched.id} - ${sched.nama}`, `Menjadwalkan interview (${sched.type} - ${sched.method}).`);
   };
   const handleUpdateSchedule = (updatedSched: InterviewSchedule) => {
     if (!canUpdate(currentRole)) { permissionDenied('mengubah jadwal interview'); return; }
     setSchedules(prev => prev.map(s => s.id === updatedSched.id ? updatedSched : s));
-    addLog('UPDATE', 'Schedule Interview', `${updatedSched.id} - ${updatedSched.nama}`, `Mengubah detail interview (Tanggal: ${updatedSched.tanggal}, Status: ${updatedSched.status}).`);
+    addLog('UPDATE', 'Schedule Interview', `${updatedSched.id} - ${updatedSched.nama}`, `Mengubah detail interview.`);
   };
   const handleDeleteSchedule = (id: string) => {
     if (!canDelete(currentRole)) { permissionDenied('menghapus jadwal interview'); return; }
     const sched = schedules.find(s => s.id === id);
     if (!sched) return;
     setSchedules(prev => prev.filter(s => s.id !== id));
-    addLog('DELETE', 'Schedule Interview', `${sched.id} - ${sched.nama}`, `Membatalkan / menghapus agenda jadwal interview.`);
+    addLog('DELETE', 'Schedule Interview', `${sched.id} - ${sched.nama}`, `Membatalkan jadwal interview.`);
   };
 
-  // SETTINGS ACTIONS — requires lockSettings permission
+  // SETTINGS ACTIONS
   const handleUpdateSettings = (updatedSettings: AppSettings) => {
     if (!canLockSettings(currentRole)) { permissionDenied('mengubah konfigurasi pengaturan'); return; }
     setSettings(updatedSettings);
     addLog('UPDATE', 'Setting', 'Konfigurasi Global', 'Memperbarui preferensi target SLA, budget cost hiring, ambang batas ATS, dan role admin.');
   };
 
-  // CLEAR LOGS — requires lockHistory permission
+  // CLEAR LOGS
   const handleClearLogs = () => {
     if (!canLockHistory(currentRole)) { permissionDenied('menghapus audit log'); return; }
     setLogs([]);
@@ -414,15 +408,14 @@ export default function App() {
               adminRoles={settings.adminRoles}
               onLogin={(role) => {
                 // Backward compat: cari user dari INITIAL_ADMIN_USERS berdasarkan roleId
-                // Note: Di implementasi nyata, LoginView sebaiknya mengirim AdminUser langsung
-                // Namun untuk kompatibilitas dengan mockData saat ini:
                 const foundUser = INITIAL_ADMIN_USERS?.find(u => u.roleId === role.id);
                 
                 if (foundUser) {
-                  handleLogin(foundUser);
+                  // Hapus password sebelum menyimpan ke state
+                  const { password, ...safeUser } = foundUser;
+                  handleLogin(safeUser as AdminUser);
                 } else {
-                  // fallback: buat dummy user jika tidak ditemukan di INITIAL_ADMIN_USERS
-                  // Ini terjadi jika user dibuat via Settings UI tapi belum ada di INITIAL_ADMIN_USERS array statis
+                  // Fallback: buat dummy user jika tidak ditemukan di INITIAL_ADMIN_USERS
                   handleLogin({
                     id: `USR-${role.id}`,
                     nama: role.roleName,
@@ -459,7 +452,7 @@ export default function App() {
         {!isPublicPortalView && (
           <header className="h-16 bg-white border-b border-slate-200 shrink-0 flex items-center justify-between px-3 sm:px-4 md:px-6 z-10 gap-2">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              {/* Mobile Hamburger - hidden when on info portal view after login */}
+              {/* Mobile Hamburger */}
               {activeMenu !== 'portal' && (
                 <button
                   onClick={() => setIsSidebarOpen(true)}
