@@ -104,8 +104,36 @@ export default function App() {
   const [jobs, setJobs] = useState<Job[]>((() =>
     getStoredData<Job[]>('careerhub_jobs', INITIAL_JOBS)
   ));
-  const [candidates, setCandidates] = useState<Candidate[]>((() =>
-    getStoredData<Candidate[]>('careerhub_candidates', INITIAL_CANDIDATES)
+  const [settings, setSettings] = useState <AppSettings >(() = >
+    normalizeSettings(getStoredData <AppSettings >('careerhub_settings', INITIAL_SETTINGS))
+  );
+  
+  // 🔹 FIX BARU: Sinkronkan currentUser dengan settings.adminRoles
+  React.useEffect(() => {
+    if (!currentUser || !currentRole) return;
+
+    // Cari role terbaru dari settings berdasarkan roleId user yang login
+    const updatedRole = settings.adminRoles.find(r => r.id === currentRole.id);
+
+    if (updatedRole) {
+      // Cek apakah email atau nama role berubah
+      if (updatedRole.email !== currentUser.email || updatedRole.roleName !== currentUser.roleName) {
+        // Update currentUser dengan data terbaru
+        const updatedUser: AdminUser = {
+          ...currentUser,
+          email: updatedRole.email,
+          roleName: updatedRole.roleName,
+          accessLevel: updatedRole.accessLevel,
+          permissions: updatedRole.permissions
+        };
+        
+        setCurrentUser(updatedUser);
+        setStoredAdmin(updatedUser); // Simpan ke localStorage
+        
+        console.log(`[SYNC] User ${currentUser.nama} synced with new email: ${updatedRole.email}`);
+      }
+    }
+  }, [settings.adminRoles, currentUser, currentRole]);
   ));
   const [schedules, setSchedules] = useState<InterviewSchedule[]>((() =>
     getStoredData<InterviewSchedule[]>('careerhub_interviews', INITIAL_INTERVIEWS)
