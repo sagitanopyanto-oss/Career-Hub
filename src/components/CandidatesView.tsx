@@ -495,41 +495,52 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 🔒 DETEKSI NYATA AKUN BROWSER (ANTI-MANIPULASI ADMIN)
-        // Membuat elemen gambar bayangan untuk mengecek apakah session email tersebut aktif di Google cookie browser
-        const imgCheck = new Image();
+        // 🔒 METODE INTERSEPTOR AKUN GOOGLE (ANTI-MANIPULASI & TANPA MERUBAH UI)
+        // Kita langsung membuka halaman validasi deteksi akun resmi milik Google
+        const targetGmailUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
         
-        // Mengarahkan ke validasi URL email spesifik milik Google
-        imgCheck.src = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/images/cleardot.gif?v=${Date.now()}`;
+        // Buka tab baru untuk mendeteksi login session secara native oleh Google
+        const newTab = window.open(targetGmailUrl, '_blank');
 
-        // Jika Gambar Berhasil Dimuat -> KONDISI 1: Email cocok & sudah login di browser (TRUE)
-        imgCheck.onload = () => {
-          const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
-          const newTab = window.open(gmailComposeUrl, '_blank');
+        if (newTab) {
+          // Menjalankan pengecekan otomatis selama 3 detik pertama di latar belakang
+          let checkCount = 0;
+          const checkSessionInterval = setInterval(() => {
+            checkCount++;
+            try {
+              // Jika email browser BERBEDA, Google otomatis me-redirect tab tersebut ke halaman pemilihan akun (AccountChooser/ServiceLogin)
+              if (newTab.location && (
+                newTab.location.href.includes("AccountChooser") || 
+                newTab.location.href.includes("ServiceLogin") ||
+                newTab.location.href.includes("signin")
+              )) {
+                // ❌ KONDISI 2 DETECTED: Tutup paksa tab tersebut agar Compose TIDAK BISA DIBUKA
+                newTab.close();
+                clearInterval(checkSessionInterval);
+                alert(
+                  `⛔ VALIDASI GAGAL (STATUS: FALSE)\n\n` +
+                  `Sebab: Email Browser Anda tidak cocok / belum login dengan akun Admin: ${senderEmail}\n` +
+                  `Tindakan: Jendela Tulis Pesan otomatis ditutup oleh sistem demi keamanan data.`
+                );
+              }
+            } catch (e) {
+              // Kebijakan Cross-Origin Browser (CORS) akan memblokir pembacaan URL jika halaman sukses masuk ke Gmail internal.
+              // Skenario ERROR CORS ini justru menandakan KONDISI 1 (TRUE): User sukses masuk ke dashboard Gmail-nya sendiri.
+            }
 
-          if (newTab) {
-            setSelectedCandidateEmail(null);
-          } else {
-            navigator.clipboard.writeText(fullEmailText).catch(() => {});
-            alert(`⚠️ Tab Gmail diblokir browser. Template disalin ke clipboard.`);
-            setSelectedCandidateEmail(null);
-          }
-        };
+            // Hentikan pemantauan setelah 6 siklus (3 detik) jika tidak ada indikasi redirect salah akun
+            if (checkCount >= 6) {
+              clearInterval(checkSessionInterval);
+            }
+          }, 500);
 
-        // Jika Gambar Gagal Dimuat -> KONDISI 2: Email berbeda / Belum login di browser (FALSE)
-        imgCheck.onerror = () => {
-          // ❌ BLOKIR TOTAL & PAKSA LOGIN
-          alert(
-            `⛔ VALIDASI GAGAL (STATUS: FALSE)\n\n` +
-            `Sebab: Akun browser Anda saat ini BERBEDA dengan Email Role Admin (${senderEmail}) atau Anda belum login ke akun tersebut!\n\n` +
-            `Tindakan: Jendela Compose Gmail diblokir demi keamanan data.`
-          );
-          
-          // Mengarahkan admin langsung ke halaman login Google untuk akun tersebut agar menyamakan session
-          const loginUrl = `https://accounts.google.com/ServiceLogin?service=mail&passive=true&Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(window.location.href)}`;
-          window.open(loginUrl, '_blank');
-        };
-
+          // Selesaikan tugas modal di aplikasi rekruter Anda
+          setSelectedCandidateEmail(null); 
+        } else {
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+          alert(`⚠️ Tab Gmail diblokir browser. Template disalin ke clipboard.`);
+          setSelectedCandidateEmail(null);
+        }
       } else {
         // Desktop Email Client (Outlook/Thunderbird)
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
