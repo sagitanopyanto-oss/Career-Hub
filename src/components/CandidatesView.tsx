@@ -481,56 +481,65 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
 
     // 🔹 PERBAIKAN LOGIKA VALIDASI EMAIL PENGGIRIM
     const handleSendEmail = async () => {
-  const subject = replacedSubject;
-  const body = replacedBody;
-  const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
+      const subject = replacedSubject;
+      const body = replacedBody;
+      const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-  // Deteksi apakah kandidat menggunakan Gmail
-  const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
-  
-  // Cek apakah browser memiliki sesi Google aktif
-  let isGoogleLoggedIn = false;
-  try {
-    const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
-    isGoogleLoggedIn = response.type === 'opaque' || response.ok;
-  } catch { 
-    isGoogleLoggedIn = false; 
-  }
-  
-  const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
+      const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
+      let isGoogleLoggedIn = false;
+      try {
+        const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
+        isGoogleLoggedIn = response.type === 'opaque' || response.ok;
+      } catch { isGoogleLoggedIn = false; }
+      
+      const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
-  if (useGmailCompose) {
-    // 🔒 SOLUSI MUTLAK: PAKSA TAMPILKAN MENU SELEKSI AKUN GOOGLE
-    // Menggunakan Google Account Chooser untuk memastikan user memilih akun yang benar
-    
-    // 1. Buat URL Gmail Compose target
-    const finalComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    // 2. Buat URL Account Chooser Google
-    // Parameter 'Email' memberi hint akun mana yang harus dipilih
-    // Parameter 'continue' mengarahkan ke Gmail Compose setelah pemilihan
-    const gmailChooserUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(finalComposeUrl)}`;
+      if (useGmailCompose) {
+        // 🔒 SOLUSI MUTLAK GMAIL: PAKSA TAMPILKAN MENU SELEKSI AKUN GOOGLE
+        const finalComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        // Tautan diarahkan langsung ke AccountChooser milik Gmail untuk validasi otomatis
+        const gmailChooserUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(finalComposeUrl)}`;
 
-    // 3. Buka tab baru dengan Account Chooser
-    const newTab = window.open(gmailChooserUrl, '_blank');
+        // Buka tab baru yang mengunci daftar akun
+        const newTab = window.open(gmailChooserUrl, '_blank');
 
-    if (newTab) {
-      // Opsional: Beri tahu user jika diperlukan, atau biarkan UI Google yang berbicara
-      // alert(`Silakan pilih akun Gmail: ${senderEmail} pada jendela yang terbuka.`);
-      setSelectedCandidateEmail(null); 
-    } else {
-      // Fallback jika popup diblokir
-      await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-      alert(`⚠️ Jendela diblokir browser. Template disalin ke clipboard.\nSilakan buka Gmail manual dengan akun ${senderEmail}.`);
-      setSelectedCandidateEmail(null);
-    }
-  } else {
-    // Untuk non-Gmail atau Desktop Client, gunakan mailto biasa
-    const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(mailtoLink, '_blank');
-    setSelectedCandidateEmail(null);
-  }
-};
+        if (newTab) {
+          setSelectedCandidateEmail(null); 
+        } else {
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+          alert(`⚠️ Jendela diblokir browser. Template disalin ke clipboard.`);
+          setSelectedCandidateEmail(null);
+        }
+      } else {
+        // 🖥️ JALUR DESKTOP NEW REVISION (OUTLOOK / THUNDERBIRD)
+        // Karena sistem web tidak bisa mengecek background app desktop, kita gunakan interseptor konfirmasi manual
+        const konfirmasiDesktop = confirm(
+          `🖥️ DETEKSI APLIKASI DESKTOP (OUTLOOK/THUNDERBIRD)\n\n` +
+          `Sistem akan membuka aplikasi email desktop Anda.\n` +
+          `Pastikan aplikasi Outlook/Thunderbird Anda saat ini aktif menggunakan akun:\n` +
+          `👉 ${senderEmail}\n\n` +
+          `• Klik OK jika sudah sesuai (Kondisi 1 - TRUE)\n` +
+          `• Klik BATAL jika akun berbeda/belum siap (Kondisi 2 - FALSE)`
+        );
+
+        if (konfirmasiDesktop) {
+          // ✅ KONDISI 1 (TRUE): Admin mengonfirmasi akun desktop sudah sama
+          const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+          window.open(mailtoLink, '_blank');
+          setSelectedCandidateEmail(null);
+        } else {
+          // ❌ KONDISI 2 (FALSE): Admin membatalkan karena akun di aplikasi desktop berbeda
+          alert(
+            `⛔ VALIDASI DIBATALKAN (STATUS: FALSE)\n\n` +
+            `Tindakan: Pembukaan Outlook/Thunderbird diblokir.\n` +
+            `Silakan sesuaikan/pindah akun di aplikasi desktop Anda terlebih dahulu.`
+          );
+          // Menghentikan proses secara mutlak, aplikasi desktop TIDAK AKAN TERBUKA
+          return; 
+        }
+      }
+    };
 
     return (
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
