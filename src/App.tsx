@@ -4,7 +4,8 @@ import {
   INITIAL_JOBS, INITIAL_CANDIDATES, INITIAL_INTERVIEWS,
   INITIAL_SETTINGS, INITIAL_HISTORY, normalizeSettings,
   Job, Candidate, InterviewSchedule, AppSettings, HistoryLog,
-  AdminUser, getStoredAdmin, setStoredAdmin
+  // 🔹 TAHAP 2: Import AdminUser & helper functions
+  AdminUser, getStoredAdmin, setStoredAdmin, validateAdminLogin
 } from './data/mockData';
 import { Sidebar } from './components/Sidebar';
 import { InfoPortalView } from './components/InfoPortalView';
@@ -20,6 +21,7 @@ import { Bell, Calendar, Menu, History, X, LogOut } from 'lucide-react';
 import { canCreate, canUpdate, canDelete, canEmail, canWhatsapp, canLockSettings, canLockHistory, permissionDenied } from './utils/permissions';
 
 export default function App() {
+  // Navigation State
   const [activeMenu, setActiveMenu] = useState<string>('portal');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -27,42 +29,39 @@ export default function App() {
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>(() =>
     getStoredData<string[]>('careerhub_dismissed_notifications', [])
   );
+
+  // Filter state
   const [filterRange, setFilterRange] = useState<'month' | '6months' | 'annual'>('6months');
   const [filterYear, setFilterYear] = useState<number>(2025);
   const [filterQuarters, setFilterQuarters] = useState<number[]>([]);
 
+  // 🔹 TAHAP 2: Login state dengan AdminUser (bukan hanya AdminRole)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() =>
     getStoredData<boolean>('careerhub_is_logged_in', false)
   );
   const [currentRole, setCurrentRole] = useState<AdminRole | null>(() =>
     getStoredData<AdminRole | null>('careerhub_current_role', null)
   );
+  // 🔹 TAHAP 2: State baru untuk user spesifik yang login
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() =>
     getStoredAdmin()
   );
 
   const isPublicPortalView = !isLoggedIn && activeMenu === 'portal';
 
+  // Sync to localStorage
   useEffect(() => { setStoredData('careerhub_is_logged_in', isLoggedIn); }, [isLoggedIn]);
   useEffect(() => { setStoredData('careerhub_current_role', currentRole); }, [currentRole]);
+  // 🔹 TAHAP 2: Sync currentUser ke localStorage via helper
   useEffect(() => { setStoredAdmin(currentUser); }, [currentUser]);
 
-  // 🔹 FIX: handleLogin sekarang menyimpan currentUser dengan email dari role
-  const handleLogin = (role: AdminRole) => {
+  // 🔹 TAHAP 2: handleLogin sekarang menerima AdminUser
+  const handleLogin = (user: AdminUser) => {
     setIsLoggedIn(true);
-    setCurrentRole(role);
-
-    const user: AdminUser = {
-      id: `USR-${role.id}`,
-      nama: role.roleName,
-      email: role.email || `${role.roleName.toLowerCase().replace(/\s/g, '.')}@careerhub.co.id`,
-      roleId: role.id,
-      roleName: role.roleName,
-      accessLevel: role.accessLevel,
-      permissions: role.permissions
-    };
     setCurrentUser(user);
-
+    // Cari role yang sesuai dari settings untuk backward compatibility
+    const matchedRole = settings.adminRoles.find(r => r.id === user.roleId) || null;
+    setCurrentRole(matchedRole);
     addLog("LOGIN", "System", `${user.nama} (${user.roleName})`, `User ${user.email} berhasil login dengan role ${user.roleName}.`);
   };
 
@@ -75,6 +74,7 @@ export default function App() {
     setIsNotificationOpen(false);
   };
 
+  // Core Database States
   const [jobs, setJobs] = useState<Job[]>(() => getStoredData<Job[]>('careerhub_jobs', INITIAL_JOBS));
   const [candidates, setCandidates] = useState<Candidate[]>(() => getStoredData<Candidate[]>('careerhub_candidates', INITIAL_CANDIDATES));
   const [schedules, setSchedules] = useState<InterviewSchedule[]>(() => getStoredData<InterviewSchedule[]>('careerhub_interviews', INITIAL_INTERVIEWS));
@@ -83,6 +83,7 @@ export default function App() {
   );
   const [logs, setLogs] = useState<HistoryLog[]>(() => getStoredData<HistoryLog[]>('careerhub_history', INITIAL_HISTORY));
 
+  // Sync to Local Storage
   useEffect(() => { setStoredData('careerhub_jobs', jobs); }, [jobs]);
   useEffect(() => { setStoredData('careerhub_candidates', candidates); }, [candidates]);
   useEffect(() => { setStoredData('careerhub_interviews', schedules); }, [schedules]);
@@ -92,6 +93,7 @@ export default function App() {
 
   const activeNotifications = logs.filter((log) => !dismissedNotificationIds.includes(log.id));
 
+  // Logging Helper — 🔹 TAHAP 2: Gunakan currentUser.nama jika tersedia
   const addLog = (action: string, menu: string, itemAffected: string, details: string) => {
     const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const newLog: HistoryLog = {
@@ -103,6 +105,7 @@ export default function App() {
     setLogs(prev => [newLog, ...prev]);
   };
 
+  // ─── Permission-checked CRUD helpers ────────────────────────────────
   const handleAddJob = (job: Job) => {
     if (!canCreate(currentRole)) { permissionDenied('membuat lowongan baru'); return; }
     setJobs(prev => [job, ...prev]);
@@ -193,8 +196,10 @@ export default function App() {
     addLog("DELETE", "History Log", "All Logs", "Membersihkan seluruh log audit riwayat transaksi.");
   };
 
+  // 🔹 TAHAP 2: Login modal state
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
+  // Render proper view based on activeMenu state
   const renderMainView = () => {
     switch (activeMenu) {
       case 'portal':
@@ -235,6 +240,7 @@ export default function App() {
         );
       case 'candidates':
         return (
+          // 🔹 TAHAP 2: Pass currentUser ke CandidatesView
           <CandidatesView
             candidates={candidates}
             jobs={jobs}
@@ -291,6 +297,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
+      {/* Login Modal Pop-up */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
@@ -299,10 +306,22 @@ export default function App() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            {/* 🔹 TAHAP 2: LoginView sekarang menggunakan validateAdminLogin */}
             <LoginView
               adminRoles={settings.adminRoles}
               onLogin={(role) => {
-                handleLogin(role);
+                // Backward compat: jika LoginView masih mengirim AdminRole,
+                // cari user yang sesuai dari INITIAL_ADMIN_USERS
+                // Nanti di TAHAP 3 kita update LoginView untuk mengirim AdminUser langsung
+                handleLogin({
+                  id: `USR-${role.id}`,
+                  nama: role.roleName,
+                  email: `${role.roleName.toLowerCase().replace(/\s/g, '.')}@careerhub.co.id`,
+                  roleId: role.id,
+                  roleName: role.roleName,
+                  accessLevel: role.accessLevel,
+                  permissions: role.permissions
+                });
                 setIsLoginModalOpen(false);
                 setActiveMenu('dashboard');
               }}
@@ -311,6 +330,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Left Sidebar */}
       {!isPublicPortalView && (
         <Sidebar
           activeMenu={activeMenu}
@@ -322,7 +342,9 @@ export default function App() {
         />
       )}
 
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Top Navbar Header */}
         {!isPublicPortalView && (
           <header className="h-16 bg-white border-b border-slate-200 shrink-0 flex items-center justify-between px-3 sm:px-4 md:px-6 z-10 gap-2">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -338,7 +360,9 @@ export default function App() {
               </div>
             </div>
 
+            {/* User info & Actions */}
             <div className="flex items-center gap-2 sm:gap-3 md:gap-4 shrink-0">
+              {/* Quick Notify */}
               <div className="relative">
                 <button onClick={() => setIsNotificationOpen(!isNotificationOpen)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 relative transition-colors" title="Notifikasi Transaksi">
                   <Bell className="w-5 h-5" />
@@ -397,7 +421,7 @@ export default function App() {
                 )}
               </div>
 
-              {/* 🔹 FIX: Avatar & User Info menggunakan currentUser (dengan email dari role) */}
+              {/* 🔹 TAHAP 2: Avatar & User Info menggunakan currentUser */}
               <div className="flex items-center gap-2 border-l border-slate-200 pl-2 sm:pl-3 md:pl-4">
                 <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
                   {currentUser?.nama?.substring(0, 2).toUpperCase() || currentRole?.roleName?.substring(0, 2).toUpperCase() || 'CH'}
@@ -412,6 +436,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Logout Button */}
               <button onClick={handleLogout} className="p-2 hover:bg-rose-50 rounded-lg text-slate-500 hover:text-rose-600 transition-colors shrink-0" title="Logout">
                 <LogOut className="w-4 h-4" />
               </button>
@@ -419,6 +444,7 @@ export default function App() {
           </header>
         )}
 
+        {/* Scrollable Page Wrapper */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 lg:p-8">
           {renderMainView()}
         </main>
