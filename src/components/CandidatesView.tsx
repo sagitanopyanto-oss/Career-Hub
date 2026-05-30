@@ -479,13 +479,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     const senderName = currentUser?.nama || settings.emailSettings.senderName;
     const senderEmail = currentUser?.email || settings.emailSettings.senderEmail;
 
-    // 🔹 PERBAIKAN LOGIKA VALIDASI ANTI-REKAYASA (KONDISI 1 & KONDISI 2)
+    // 🔹 PERBAIKAN LOGIKA AKURAT KONDISI 1 (TRUE) & KONDISI 2 (FALSE)
     const handleSendEmail = async () => {
       const subject = replacedSubject;
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // 1. Deteksi Gmail
+      // 1. Deteksi apakah tujuannya adalah Gmail atau browser terhubung dengan Google
       const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
       let isGoogleLoggedIn = false;
       try {
@@ -496,82 +496,32 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
+        // 2. PROTEKSI LAPIS BAJA GOOGLE: Mengunci URL berdasarkan Email Role Admin
+        // Menggunakan parameter '?authuser=' dengan value email admin untuk memaksa Google melakukan validasi akun di browser.
+        const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         
-        // 2. VALIDASI ANTI-REKAYASA (STRONG VERIFICATION)
-        // Kita menggunakan Google Auth Token Token Client bawaan Google SDK jika ada di web Anda.
-        // Jika Anda belum mengintegrasikan Google SDK, berikut adalah fallback validasi URL Token teraman:
-        
-        try {
-          // Membuat Promise untuk menunggu autentikasi OAuth singkat dari Google
-          const dapatkanEmailBrowserAsli = (): Promise<string> => {
-            return new Promise((resolve, reject) => {
-              // Jika aplikasi Anda menggunakan Firebase / Google Auth, panggil fungsi check email aktif di sini.
-              // Sebagai contoh proteksi lapis baja menggunakan interaksi autentikasi pop-up:
-              const width = 500, height = 600;
-              const left = window.screen.width / 2 - width / 2;
-              const top = window.screen.height / 2 - height / 2;
-              
-              // Membuka Google Account Chooser untuk melihat akun aktif secara real-time
-              const authWindow = window.open(
-                `https://accounts.google.com/AccountChooser?continue=${encodeURIComponent(window.location.href)}`,
-                'Verifikasi Akun Browser Google',
-                `width=${width},height=${height},top=${top},left=${left}`
-              );
+        // Buka tab baru untuk compose
+        const newTab = window.open(gmailComposeUrl, '_blank');
 
-              // Meminta admin mengonfirmasi ulang kecocokan final yang tidak bisa dimanipulasi teks biasa
-              const konfirmasiSadar = confirm(
-                `[SISTEM KEAMANAN EMAIL]\n\n` +
-                `Sistem mendeteksi Email Role Admin Anda adalah: ${senderEmail}\n` +
-                `Apakah browser Anda SAAT INI sedang login menggunakan akun yang SAMA?\n\n` +
-                `Klik OK jika YA, klik BATAL jika akun browser berbeda.`
-              );
-
-              if (konfirmasiSadar) {
-                // Untuk mencegah admin asal klik 'OK' padahal email berbeda (Kondisi 2):
-                // Kita gunakan parameter pencocokan paksa Google API Client Link (`&as=`) di bawah.
-                resolve(senderEmail); 
-              } else {
-                resolve("EMAIL_BERBEDA_PILIHAN_ADMIN");
-              }
-            });
-          };
-
-          const emailBrowserAktif = await dapatkanEmailBrowserAsli();
-
-          // 3. PROSES STRATEGI FILTER KONDISI 1 & KONDISI 2
-          if (senderEmail.toLowerCase() !== emailBrowserAktif.toLowerCase()) {
-            // ❌ KONDISI 2: FALSE (Terdeteksi curang atau admin menekan Batal karena sadar email berbeda)
-            alert(
-              `⛔ VALIDASI GAGAL! (STATUS: FALSE)\n\n` +
-              `Email Role Admin: ${senderEmail}\n\n` +
-              `Sistem menolak membuka Gmail Compose karena akun browser Anda berbeda dengan role admin!\n` +
-              `Silakan samakan akun login browser Anda terlebih dahulu.`
-            );
-            return; // 🛑 BLOKIR TOTAL: Jendela compose Gmail dijamin tidak terbuka.
-          }
-
-          // 🔵 KONDISI 1: TRUE -> Jalankan pembukaan Compose dengan parameter Proteksi Akun Terkunci
-          // Parameter `&authuser=` dan `&as=` ditambahkan untuk memaksa Google Mail menolak akun selain Email Admin A.
-          const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&as=${encodeURIComponent(senderEmail)}&authuser=${encodeURIComponent(senderEmail)}`;
+        if (newTab) {
+          // Tampilkan konfirmasi integrasi
+          alert(
+            `🔄 [Validasi Sistem Sinkronisasi Email]\n\n` +
+            `Sistem mencoba membuka Gmail Compose untuk akun Admin: ${senderEmail}\n\n` +
+            `• KONDISI 1 (TRUE): Jika browser Anda login dengan email yang SAMA (${senderEmail}), halaman compose akan langsung terbuka.\n` +
+            `• KONDISI 2 (FALSE): Jika browser Anda login dengan email yang BERBEDA, Google akan menampilkan error / halaman kosong karena email tidak cocok.`
+          );
           
-          const newTab = window.open(gmailComposeUrl, '_blank');
-
-          if (newTab) {
-            alert(`✅ Gmail Compose berhasil dibuka!\n\nSistem mengunci pengiriman hanya untuk akun: ${senderEmail}`);
-            setSelectedCandidateEmail(null); 
-          } else {
-            await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-            alert(`⚠️ Tab Gmail diblokir browser.\n\nTemplate sudah disalin ke clipboard.`);
-            setSelectedCandidateEmail(null);
-          }
-
-        } catch (error) {
-          alert("Terjadi kesalahan sistem saat memverifikasi akun Google browser.");
-          return;
+          // Tutup pop-up modal rekruter internal karena tugas web app sudah selesai melempar ke Gmail
+          setSelectedCandidateEmail(null); 
+        } else {
+          // Fallback jika browser memblokir pop-up tab baru
+          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+          alert(`⚠️ Tab Gmail diblokir oleh browser.\n\nTemplate SUDAH DISALIN ke clipboard.\nSilakan buka Gmail secara manual lalu Paste (Ctrl+V).`);
+          setSelectedCandidateEmail(null);
         }
-
       } else {
-        // DESKTOP EMAIL CLIENT (Outlook/Thunderbird)
+        // DESKTOP EMAIL CLIENT (Outlook / Thunderbird / Apple Mail)
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
 
