@@ -481,60 +481,78 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
 
     // 🔹 PERBAIKAN LOGIKA VALIDASI EMAIL PENGGIRIM
     const handleSendEmail = async () => {
-      const subject = replacedSubject;
-      const body = replacedBody;
-      const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
+  const subject = replacedSubject;
+  const body = replacedBody;
+  const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // 1. Deteksi apakah browser sedang login Gmail
-      const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
-      let isGoogleLoggedIn = false;
-      try {
-        const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
-        isGoogleLoggedIn = response.type === 'opaque' || response.ok;
-      } catch { isGoogleLoggedIn = false; }
+  // 1. Deteksi apakah browser sedang login Gmail
+  const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email); // Cek email kandidat dulu
+  let isGoogleLoggedIn = false;
+  
+  // Coba deteksi sesi Gmail aktif di browser (Best Effort)
+  try {
+    const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
+    // Jika response type opaque, berarti ada request ke domain gmail, kemungkinan besar sudah login
+    isGoogleLoggedIn = response.type === 'opaque' || response.ok;
+  } catch {
+    isGoogleLoggedIn = false;
+  }
+  
+  const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
+
+  if (useGmailCompose) {
+    // 2. VALIDASI: Cek apakah Email Role Admin adalah akun Gmail yang sama dengan yang login
+    // Karena kita tidak bisa tahu persis email mana yang login di tab sebelah, 
+    // kita cek apakah Email Role Admin BERDOMAIN GMAIL.
+    
+    const isAdminEmailGmail = /gmail\.com|googlemail\.com/i.test(currentUser?.email || '');
+    
+    // Jika Email Role BUKAN Gmail, tapi browser pakai Gmail -> POTENSI MISMATCH
+    if (!isAdminEmailGmail && currentUser?.email) {
+      const confirmed = window.confirm(
+        `⚠️ PERINGATAN KETIDAKCOCKOKAN EMAIL!\n\n` +
+        `Email Pengirim di Role Admin: ${currentUser.email}\n` +
+        `Browser Terdeteksi Menggunakan: Gmail\n\n` +
+        `Gmail TIDAK BISA mengirim dari "${currentUser.email}".\n` +
+        `Email AKAN TERKIRIM dari akun Gmail yang sedang login di browser ini.\n\n` +
+        `Apakah Anda yakin ingin melanjutkan?\n` +
+        `(Klik OK untuk lanjut, Cancel untuk batal)`
+      );
       
-      const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
+      if (!confirmed) return; // HENTIKAN PROSES JIKA USER BATAL
+    }
 
-      if (useGmailCompose) {
-        // 2. VALIDASI KETAT: Cek apakah Email Role Admin adalah Gmail
-        const isAdminEmailGmail = /gmail\.com|googlemail\.com/i.test(senderEmail);
+    // Lanjutkan buka Gmail Compose
+    const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const newTab = window.open(gmailComposeUrl, '_blank');
 
-        if (!isAdminEmailGmail) {
-          // KASUS FALSE: Email Role BUKAN Gmail, tapi Browser pakai Gmail -> BLOCK!
-          alert(
-            `⛔ GAGAL MENGIRIM EMAIL\n\n` +
-            `Email Role Admin Anda: ${senderEmail}\n` +
-            `Akun Gmail Terdeteksi di Browser: YA\n\n` +
-            `Sistem memblokir pengiriman karena ketidakcocokan akun.\n` +
-            `Silakan:\n` +
-            `1. Login ke browser menggunakan akun: ${senderEmail}\n` +
-            `2. Atau ubah Email Role Admin di Pengaturan menjadi akun Gmail yang sedang aktif.`
-          );
-          return; // HENTIKAN PROSES, JANGAN BUKA TAB
-        }
+    if (newTab) {
+      alert(
+        `✅ Gmail Compose terbuka di tab baru!\n\n` +
+        `📧 PENTING: Email akan dikirim dari AKUN GMAIL YANG SEDANG LOGIN DI BROWSER.\n` +
+        `   Bukan dari "${currentUser?.email}" jika berbeda.\n\n` +
+        `📎 Lampiran harus dilampirkan MANUAL:\n` +
+        `1. Klik ikon 📎 (Attach files) di Gmail\n` +
+        `2. Pilih file CV/dokumen dari komputer Anda`
+      );
+    } else {
+      await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+      alert(`⚠️ Tab Gmail diblokir. Template disalin ke clipboard.`);
+    }
 
-        // KASUS TRUE: Email Role ADALAH Gmail -> Lanjut buka Gmail Compose
-        const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        const newTab = window.open(gmailComposeUrl, '_blank');
+  } else {
+    // Desktop Email Client Logic (Outlook/Thunderbird)
+    const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
 
-        if (newTab) {
-          alert(`✅ Gmail Compose terbuka di tab baru!\n\n📎 Lampiran harus dilampirkan MANUAL:\n1. Klik ikon 📎 (Attach files) di Gmail\n2. Pilih file CV/dokumen dari komputer Anda\n\n💡 Tip: Gunakan tombol "Download CV" di tabel kandidat sebelum mengirim email.`);
-        } else {
-          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(`⚠️ Tab Gmail diblokir.\n\nTemplate SUDAH DISALIN ke clipboard.\nSilakan buka Gmail manual dan Paste (Ctrl+V).`);
-        }
-      } else {
-        // DESKTOP EMAIL CLIENT (Outlook/Thunderbird)
-        const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.open(mailtoLink, '_blank');
+    setTimeout(async () => {
+      await navigator.clipboard.writeText(fullEmailText).catch(() => {});
+      alert(`📧 Email Desktop Terdeteksi. Template disalin ke clipboard.`);
+    }, 800);
+  }
 
-        setTimeout(async () => {
-          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(`📧 Email Desktop Terdeteksi\n\nTemplate SUDAH DISALIN ke clipboard (Ctrl+V sebagai backup).\n📎 Lampirkan file secara manual setelah email terbuka.`);
-        }, 800);
-      }
-      setSelectedCandidateEmail(null);
-    };
+  setSelectedCandidateEmail(null);
+};
 
     return (
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
