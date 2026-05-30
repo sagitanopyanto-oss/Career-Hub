@@ -16,11 +16,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [syncGoogleCalendar, setSyncGoogleCalendar] = useState(settings.syncGoogleCalendar);
   const [targetSlaDays, setTargetSlaDays] = useState<SlaSetting[]>([...settings.targetSlaDays]);
   const [targetSlaManagement, setTargetSlaManagement] = useState(settings.targetSlaManagement ?? 85);
-
+  
   const [deptBudgets, setDeptBudgets] = useState<BudgetSetting[]>(
     settings.budgetCostHiring.map(b => ({ ...b, year: b.year || new Date().getFullYear() }))
   );
+  
+  // State untuk Role Admin
   const [adminRoles, setAdminRoles] = useState<AdminRole[]>(settings.adminRoles.map((role) => ({ ...role })));
+  
   const [infoPortal, setInfoPortal] = useState<AppSettings['infoPortal']>({ ...settings.infoPortal });
   const [emailSettings, setEmailSettings] = useState<AppSettings['emailSettings']>({
     ...settings.emailSettings,
@@ -35,9 +38,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   });
   const [activeEmailTemplate, setActiveEmailTemplate] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
   const [whatsappSettings, setWhatsappSettings] = useState<AppSettings['whatsappSettings']>({ ...settings.whatsappSettings });
+  
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveSection, setSaveSection] = useState('');
 
+  // Modal States
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
@@ -46,8 +51,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [newDeptYear, setNewDeptYear] = useState<number>(new Date().getFullYear());
   const [newDeptBudget, setNewDeptBudget] = useState<number>(0);
 
+  // Role Form State
   const [roleFormName, setRoleFormName] = useState('');
-  const [roleFormEmail, setRoleFormEmail] = useState(''); // 🔹 BARU
+  const [roleFormEmail, setRoleFormEmail] = useState(''); // 🔹 BARU: Field Email
   const [roleFormAccess, setRoleFormAccess] = useState<AdminRole['accessLevel']>('Recruiter');
   const [roleFormStatus, setRoleFormStatus] = useState<AdminRole['status']>('Active');
   const [roleFormDescription, setRoleFormDescription] = useState('');
@@ -75,7 +81,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     });
   };
 
-  // Budget CRUD Logic
+  // --- Budget CRUD Logic ---
   const openAddBudgetModal = () => {
     setEditingBudgetKey(null);
     setNewDeptName('');
@@ -98,16 +104,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     const trimmedName = newDeptName.trim();
     const oldKey = editingBudgetKey;
     const newKey = `${trimmedName}-${newDeptYear}`;
-    const isDuplicate = deptBudgets.some(b =>
-      b.department.toLowerCase() === trimmedName.toLowerCase() &&
-      b.year === newDeptYear &&
+    
+    const isDuplicate = deptBudgets.some(b => 
+      b.department.toLowerCase() === trimmedName.toLowerCase() && 
+      b.year === newDeptYear && 
       `${b.department}-${b.year}` !== oldKey
     );
+
     if (isDuplicate) {
       alert(`Budget untuk departemen "${trimmedName}" pada tahun ${newDeptYear} sudah ada!`);
       return;
     }
+
     const finalBudget = Number(newDeptBudget);
+
     if (oldKey) {
       if (oldKey === newKey) {
         setDeptBudgets(prev => prev.map(b => (b.department === trimmedName && b.year === newDeptYear) ? { ...b, budget: finalBudget } : b));
@@ -118,6 +128,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     } else {
       setDeptBudgets(prev => [...prev, { department: trimmedName, year: newDeptYear, budget: finalBudget, actual: 0 }]);
     }
+
     syncSettingsToParent();
     setIsBudgetModalOpen(false);
     setSaveSection(editingBudgetKey ? 'Update Budget' : 'Tambah Budget');
@@ -131,11 +142,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     syncSettingsToParent();
   };
 
-  // Role CRUD Logic
+  // --- Role CRUD Logic ---
   const resetRoleForm = () => {
-    setEditingRoleId(null); setRoleFormName(''); setRoleFormEmail(''); // 🔹 BARU
-    setRoleFormAccess('Recruiter'); setRoleFormStatus('Active');
-    setRoleFormDescription(''); setRoleFormPassword('');
+    setEditingRoleId(null); 
+    setRoleFormName(''); 
+    setRoleFormEmail(''); // 🔹 RESET EMAIL
+    setRoleFormAccess('Recruiter'); 
+    setRoleFormStatus('Active');
+    setRoleFormDescription(''); 
+    setRoleFormPassword('');
     setRoleFormPermissions({ create: false, review: true, update: false, delete: false, email: true, whatsapp: false, lockSettings: false, lockHistory: false });
     setShowPassword(false);
   };
@@ -143,29 +158,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const openCreateRole = () => { resetRoleForm(); setIsRoleModalOpen(true); };
 
   const openEditRole = (role: AdminRole) => {
-    setEditingRoleId(role.id); setRoleFormName(role.roleName);
-    setRoleFormEmail(role.email || ''); // 🔹 BARU
-    setRoleFormAccess(role.accessLevel); setRoleFormStatus(role.status);
-    setRoleFormDescription(role.description); setRoleFormPermissions({ ...role.permissions });
-    setRoleFormPassword(role.password || ''); setShowPassword(false); setIsRoleModalOpen(true);
+    setEditingRoleId(role.id); 
+    setRoleFormName(role.roleName);
+    setRoleFormEmail(role.email || ''); // 🔹 ISI EMAIL SAAT EDIT
+    setRoleFormAccess(role.accessLevel); 
+    setRoleFormStatus(role.status);
+    setRoleFormDescription(role.description); 
+    setRoleFormPermissions({ ...role.permissions });
+    setRoleFormPassword(role.password || ''); 
+    setShowPassword(false); 
+    setIsRoleModalOpen(true);
   };
 
   const saveRole = (e: React.FormEvent) => {
     e.preventDefault();
     if (!roleFormName.trim()) return;
-    if (!roleFormEmail.trim()) { alert('Email role wajib diisi!'); return; } // 🔹 BARU
+    if (!roleFormEmail.trim()) { alert('Email role wajib diisi!'); return; } // 🔹 VALIDASI EMAIL
     if (!roleFormPassword.trim() && !editingRoleId) return;
 
     const nextRole: AdminRole = {
       id: editingRoleId || `ROLE-${String(adminRoles.length + 1).padStart(3, '0')}`,
       roleName: roleFormName.trim(),
-      email: roleFormEmail.trim(), // 🔹 BARU
-      accessLevel: roleFormAccess, status: roleFormStatus,
-      description: roleFormDescription.trim(), permissions: { ...roleFormPermissions },
+      email: roleFormEmail.trim(), // 🔹 SIMPAN EMAIL
+      accessLevel: roleFormAccess, 
+      status: roleFormStatus,
+      description: roleFormDescription.trim(), 
+      permissions: { ...roleFormPermissions },
       password: roleFormPassword.trim() || (editingRoleId ? adminRoles.find(r => r.id === editingRoleId)?.password || '' : '')
     };
+
     setAdminRoles((prev) => editingRoleId ? prev.map((item) => (item.id === editingRoleId ? nextRole : item)) : [nextRole, ...prev]);
-    resetRoleForm(); setIsRoleModalOpen(false);
+    resetRoleForm(); 
+    setIsRoleModalOpen(false);
     syncSettingsToParent();
     setSaveSection(editingRoleId ? 'Update Role' : 'Tambah Role');
     setSaveSuccess(true);
@@ -455,8 +479,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="md:col-span-2 flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100"><span className="text-xs font-bold text-slate-700">Aktifkan Email Otomatis:</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={emailSettings.enabled} onChange={(e) => setEmailSettings({ ...emailSettings, enabled: e.target.checked })} className="sr-only peer" /><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div></label></div>
               <div><label className="text-[11px] font-bold text-slate-600 block mb-1">Nama Pengirim</label><input type="text" value={emailSettings.senderName} onChange={(e) => setEmailSettings({ ...emailSettings, senderName: e.target.value })} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" placeholder="CareerHub Recruitment Team" /></div>
-              <div><label className="text-[11px] font-bold text-slate-600 block mb-1">Email Pengirim</label><input type="email" value={emailSettings.senderEmail} onChange={(e) => setEmailSettings({ ...emailSettings, senderEmail: e.target.value })} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" placeholder="recruitment@careerhub.co.id" /></div>
-              <div className="md:col-span-2"><label className="text-[11px] font-bold text-slate-600 block mb-1">Reply To</label><input type="email" value={emailSettings.replyTo} onChange={(e) => setEmailSettings({ ...emailSettings, replyTo: e.target.value })} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" placeholder="recruitment@careerhub.co.id" /></div>
+              <div><label className="text-[11px] font-bold text-slate-600 block mb-1">Email Pengirim Global (Fallback)</label><input type="email" value={emailSettings.senderEmail} onChange={(e) => setEmailSettings({ ...emailSettings, senderEmail: e.target.value })} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" placeholder="recruitment@careerhub.co.id" /></div>
+              <div className="md:col-span-2"><label className="text-[11px] font-bold text-slate-600 block mb-1">Reply To Global</label><input type="email" value={emailSettings.replyTo} onChange={(e) => setEmailSettings({ ...emailSettings, replyTo: e.target.value })} className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" placeholder="recruitment@careerhub.co.id" /></div>
             </div>
             <div className="pt-4 border-t border-slate-100">
               <label className="text-[11px] font-bold text-slate-600 block mb-2">Template Email Tahapan:</label>
