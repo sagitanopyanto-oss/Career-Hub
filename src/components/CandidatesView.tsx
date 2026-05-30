@@ -3,13 +3,13 @@ import {
   Plus, Search, Edit3, Trash2, Eye, Download, FileText, Sparkles,
   AlertTriangle, X, CheckCircle, Filter, Mail, Send, MessageCircle
 } from 'lucide-react';
-import { Candidate, Job, AppSettings, AdminUser } from '../data/mockData'; // 🔹 TAHAP 3: Import AdminUser
+import { Candidate, Job, AppSettings, AdminUser } from '../data/mockData';
 
 interface CandidatesViewProps {
   candidates: Candidate[];
   jobs: Job[];
   settings: AppSettings;
-  currentUser?: AdminUser | null; // 🔹 TAHAP 3: Prop baru
+  currentUser?: AdminUser | null;
   onAddCandidate: (candidate: Candidate) => void;
   onUpdateCandidate: (candidate: Candidate) => void;
   onDeleteCandidate: (id: string) => void;
@@ -21,7 +21,7 @@ interface CandidatesViewProps {
 }
 
 export const CandidatesView: React.FC<CandidatesViewProps> = ({
-  candidates, jobs, settings, currentUser, // 🔹 TAHAP 3: Destructure currentUser
+  candidates, jobs, settings, currentUser,
   onAddCandidate, onUpdateCandidate, onDeleteCandidate,
   canCreate = true, canUpdate = true, canDelete = true,
   canEmail = true, canWhatsapp = true
@@ -40,6 +40,8 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [emailStage, setEmailStage] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
+  
+  // Form States
   const [formNama, setFormNama] = useState('');
   const [formTelepon, setFormTelepon] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -74,9 +76,19 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
 
   const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
+  const hitungUsia = (tglLahir?: string): number => {
+    if (!tglLahir) return 0;
+    const birthDate = new Date(tglLahir);
+    const today = new Date('2026-02-28');
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age;
+  };
+
   const openWhatsApp = (cand: Candidate) => {
     if (!canWhatsapp) {
-      alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.\nHubungi administrator jika Anda memerlukan akses ini.');
+      alert('⛔ Akses Ditolak\n\nRole Anda tidak memiliki izin untuk mengirim WhatsApp.');
       return;
     }
     if (!settings.whatsappSettings.enabled) {
@@ -90,7 +102,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     const draft = settings.whatsappSettings.confirmationTemplate
       .replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar)
       .replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
-      
+
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank');
   };
 
@@ -147,14 +159,14 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       } else {
         element.href = cand.cvDataUrl;
         element.download = cand.cvName;
-        element.target = '_blank'; 
+        element.target = '_blank';
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
       }
       return;
     }
-    // Mock CV content for download if no real file
+    // Mock PDF fallback
     const mockContent = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 44>>stream\nBT /F1 12 Tf 50 700 Td (CV - ${cand.nama}) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000266 00000 n \n0000000359 00000 n \ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n415\n%%EOF`;
     const blob = new Blob([mockContent], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -190,16 +202,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     if (editingCandidate) onUpdateCandidate(candData);
     else onAddCandidate(candData);
     setIsModalOpen(false);
-  };
-
-  const hitungUsia = (tglLahir?: string) => {
-    if (!tglLahir) return 0;
-    const birthDate = new Date(tglLahir);
-    const today = new Date('2026-02-28');
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
   };
 
   const filteredCandidates = candidates.filter(c => {
@@ -246,6 +248,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       else missingSkills.push(s);
     });
     const meetsThreshold = cand.ratingKecocokan >= settings.autoScreeningATS;
+
     return (
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
@@ -329,12 +332,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
           </div>
 
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-end">
-            <button
-              onClick={() => setSelectedCandidateATS(null)}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all"
-            >
-              Tutup Analisis
-            </button>
+            <button onClick={() => setSelectedCandidateATS(null)} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all">Tutup Analisis</button>
           </div>
         </div>
       </div>
@@ -348,19 +346,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8 flex flex-col">
           <div className="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-indigo-400" />
-              <h3 className="font-extrabold text-sm">Review Resume / CV - {cand.nama}</h3>
-            </div>
+            <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-indigo-400" /><h3 className="font-extrabold text-sm">Review Resume / CV - {cand.nama}</h3></div>
             <button onClick={() => setPreviewCV(null)} className="p-1 hover:bg-slate-800 rounded text-slate-400"><X className="w-5 h-5" /></button>
           </div>
           <div className="p-0 sm:p-6 bg-slate-50/50 flex-1 overflow-y-auto max-h-[75vh]">
             <div className="bg-white shadow-sm border border-slate-200 w-full max-w-2xl mx-auto sm:rounded-xl overflow-hidden min-h-[500px]">
               <div className="bg-indigo-900 text-white p-6 sm:p-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{cand.nama}</h1>
-                  <p className="text-indigo-200 font-semibold mt-1">{cand.jabatanTerakhir || cand.posisiDilamar}</p>
-                </div>
+                <div><h1 className="text-2xl sm:text-3xl font-black tracking-tight">{cand.nama}</h1><p className="text-indigo-200 font-semibold mt-1">{cand.jabatanTerakhir || cand.posisiDilamar}</p></div>
                 <div className="text-right flex flex-col gap-1 text-xs text-indigo-100">
                   <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">✉</span> {cand.email}</span>
                   <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">☎</span> {cand.telepon}</span>
@@ -369,8 +361,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-100">
                 <div className="p-6 sm:p-8 bg-slate-50 space-y-8 md:col-span-1">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Personal</h3>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Personal</h3>
                     <div className="space-y-3 text-xs text-slate-600">
                       <div><span className="block text-slate-400 font-bold mb-0.5">Gender</span><span>{cand.gender}</span></div>
                       <div><span className="block text-slate-400 font-bold mb-0.5">Tempat, Tanggal Lahir</span><span>{cand.tempatLahir}, {new Date(cand.tanggalLahir).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({hitungUsia(cand.tanggalLahir)} Thn)</span></div>
@@ -379,14 +370,10 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                       <div><span className="block text-slate-400 font-bold mb-0.5">Ekspektasi Gaji</span><span className="font-semibold text-slate-800">{formatRupiah(cand.expectedSalary)}</span></div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Top Skills</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {matchedJob ? matchedJob.skills.slice(0, 5).map(s => (<span key={s} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">{s}</span>)) : <span className="text-xs text-slate-400">Tidak ada data.</span>}
-                    </div>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">Top Skills</h3>
+                    <div className="flex flex-wrap gap-1.5">{matchedJob ? matchedJob.skills.slice(0, 5).map(s => (<span key={s} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">{s}</span>)) : <span className="text-xs text-slate-400">Tidak ada data.</span>}</div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">ATS Score</h3>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-3">ATS Score</h3>
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-[10px] text-white ${cand.ratingKecocokan >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`}>{cand.ratingKecocokan}%</div>
                       <span className="text-[10px] text-slate-500 font-semibold leading-tight">{cand.ratingKecocokan >= 70 ? 'Recommended' : 'Needs Review'}</span>
@@ -394,46 +381,23 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                   </div>
                 </div>
                 <div className="p-6 sm:p-8 md:col-span-2 space-y-8">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pengalaman Kerja</h3>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pengalaman Kerja</h3>
                     <div className="relative pl-4 border-l-2 border-slate-100 space-y-6">
-                      <div className="relative">
-                        <div className="absolute w-2.5 h-2.5 bg-indigo-500 rounded-full -left-[21px] top-1 ring-4 ring-white"></div>
-                        <h4 className="font-bold text-slate-800 text-sm">{cand.jabatanTerakhir || cand.posisiDilamar}</h4>
-                        <p className="text-xs text-slate-500 font-medium mb-2">Total Pengalaman: {cand.pengalaman} Tahun</p>
-                        <p className="text-xs text-slate-600 leading-relaxed">Berpengalaman selama {cand.pengalaman} tahun dalam bidang {cand.jurusan || 'yang relevan'}, terbiasa bekerja dalam tim maupun individu dengan orientasi pencapaian target dan solusi yang inovatif.</p>
-                      </div>
+                      <div className="relative"><div className="absolute w-2.5 h-2.5 bg-indigo-500 rounded-full -left-[21px] top-1 ring-4 ring-white"></div><h4 className="font-bold text-slate-800 text-sm">{cand.jabatanTerakhir || cand.posisiDilamar}</h4><p className="text-xs text-slate-500 font-medium mb-2">Total Pengalaman: {cand.pengalaman} Tahun</p><p className="text-xs text-slate-600 leading-relaxed">Berpengalaman selama {cand.pengalaman} tahun dalam bidang {cand.jurusan || 'yang relevan'}, terbiasa bekerja dalam tim maupun individu dengan orientasi pencapaian target dan solusi yang inovatif.</p></div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pendidikan Formal</h3>
-                    <div className="relative pl-4 border-l-2 border-slate-100">
-                      <div className="relative">
-                        <div className="absolute w-2.5 h-2.5 bg-slate-300 rounded-full -left-[21px] top-1 ring-4 ring-white"></div>
-                        <h4 className="font-bold text-slate-800 text-sm">{cand.jurusan || 'Jurusan Umum'}</h4>
-                        <p className="text-xs text-slate-500 font-medium mb-1">Gelar: {cand.pendidikan}</p>
-                      </div>
-                    </div>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Pendidikan Formal</h3>
+                    <div className="relative pl-4 border-l-2 border-slate-100"><div className="relative"><div className="absolute w-2.5 h-2.5 bg-slate-300 rounded-full -left-[21px] top-1 ring-4 ring-white"></div><h4 className="font-bold text-slate-800 text-sm">{cand.jurusan || 'Jurusan Umum'}</h4><p className="text-xs text-slate-500 font-medium mb-1">Gelar: {cand.pendidikan}</p></div></div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Aplikasi Pekerjaan</h3>
-                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-xs">
-                      <p className="text-indigo-900 mb-1">Posisi dilamar:</p>
-                      <p className="font-black text-indigo-700 text-sm">{cand.posisiDilamar}</p>
-                      <p className="text-indigo-600 mt-2 font-semibold">Tanggal Apply: {cand.tanggalApplied}</p>
-                    </div>
+                  <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Aplikasi Pekerjaan</h3>
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-xs"><p className="text-indigo-900 mb-1">Posisi dilamar:</p><p className="font-black text-indigo-700 text-sm">{cand.posisiDilamar}</p><p className="text-indigo-600 mt-2 font-semibold">Tanggal Apply: {cand.tanggalApplied}</p></div>
                   </div>
                   {cand.cvDataUrl && (
-                    <div>
-                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Dokumen Terlampir</h3>
+                    <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Dokumen Terlampir</h3>
                       <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
-                        {cand.cvMimeType?.includes('image') ? (
-                          <img src={cand.cvDataUrl} alt={cand.cvName} className="w-full max-h-[320px] object-contain bg-white" />
-                        ) : cand.cvMimeType?.includes('pdf') ? (
-                          <iframe src={cand.cvDataUrl} title={cand.cvName} className="w-full h-[320px] bg-white" />
-                        ) : (
-                          <div className="p-6 text-center text-xs text-slate-500">Preview tidak tersedia untuk format ini. Silakan gunakan tombol download untuk membuka dokumen.</div>
-                        )}
+                        {cand.cvMimeType?.includes('image') ? (<img src={cand.cvDataUrl} alt={cand.cvName} className="w-full max-h-[320px] object-contain bg-white" />)
+                          : cand.cvMimeType?.includes('pdf') ? (<iframe src={cand.cvDataUrl} title={cand.cvName} className="w-full h-[320px] bg-white" />)
+                            : (<div className="p-6 text-center text-xs text-slate-500">Preview tidak tersedia untuk format ini. Silakan gunakan tombol download untuk membuka dokumen.</div>)}
                       </div>
                     </div>
                   )}
@@ -450,13 +414,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     );
   };
 
-  // ─── EMAIL MODAL (UPLOAD DISABLED) ───────────────────────────────────
+  // ─── EMAIL MODAL ─────────────────────────────────────────────────────
   const renderEmailModal = (cand: Candidate) => {
     const template = settings.emailSettings.templates[emailStage];
     const replacedSubject = template.subject.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
     const replacedBody = template.body.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
-
-    // 🔹 TAHAP 3: Tentukan pengirim berdasarkan currentUser atau fallback ke settings
+    
+    // Gunakan email user login jika tersedia, fallback ke settings global
     const senderName = currentUser?.nama || settings.emailSettings.senderName;
     const senderEmail = currentUser?.email || settings.emailSettings.senderEmail;
 
@@ -470,51 +434,27 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       try {
         const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
         isGoogleLoggedIn = response.type === 'opaque' || response.ok;
-      } catch {
-        isGoogleLoggedIn = false;
-      }
+      } catch { isGoogleLoggedIn = false; }
+      
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
         const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         const newTab = window.open(gmailComposeUrl, '_blank');
-
         if (newTab) {
-          alert(
-            `✅ Gmail Compose terbuka di tab baru!\n\n` +
-            `📎 Lampiran harus dilampirkan MANUAL:\n` +
-            `1. Klik ikon 📎 (Attach files) di Gmail\n` +
-            `2. Pilih file CV/dokumen dari komputer Anda\n\n` +
-            `💡 Tip: Gunakan tombol "Download CV" di tabel kandidat\n` +
-            `   sebelum mengirim email agar file siap dilampirkan.`
-          );
+          alert(`✅ Gmail Compose terbuka di tab baru!\n\n📎 Lampiran harus dilampirkan MANUAL:\n1. Klik ikon 📎 (Attach files) di Gmail\n2. Pilih file CV/dokumen dari komputer Anda\n\n💡 Tip: Gunakan tombol "Download CV" di tabel kandidat sebelum mengirim email.`);
         } else {
           await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(
-            `⚠️ Tab Gmail diblokir oleh browser.\n\n` +
-            `Template email SUDAH DISALIN ke clipboard.\n` +
-            `Silakan buka Gmail manual dan Paste (Ctrl+V).\n` +
-            `Lampirkan file secara manual.`
-          );
+          alert(`⚠️ Tab Gmail diblokir.\n\nTemplate SUDAH DISALIN ke clipboard.\nSilakan buka Gmail manual dan Paste (Ctrl+V).`);
         }
       } else {
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
-
         setTimeout(async () => {
           await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(
-            `📧 Email Desktop Terdeteksi (Outlook/Thunderbird/dll)\n\n` +
-            `✅ Aplikasi email seharusnya sudah terbuka di tab baru.\n` +
-            `✅ Template SUDAH DISALIN ke clipboard (Ctrl+V sebagai backup).\n\n` +
-            `📎 Lampiran harus dilampirkan MANUAL:\n` +
-            `Klik tombol 📎 Attach di email Anda, lalu pilih file.\n\n` +
-            `💡 Tip: Gunakan tombol "Download CV" di tabel kandidat\n` +
-            `   sebelum mengirim email agar file siap dilampirkan.`
-          );
+          alert(`📧 Email Desktop Terdeteksi\n\nTemplate SUDAH DISALIN ke clipboard (Ctrl+V sebagai backup).\n📎 Lampirkan file secara manual setelah email terbuka.`);
         }, 800);
       }
-
       setSelectedCandidateEmail(null);
     };
 
@@ -522,28 +462,16 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
           <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-indigo-700 text-white">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg"><Send className="w-5 h-5" /></div>
-              <div>
-                <h3 className="font-extrabold text-base sm:text-lg">Kirim Email Notifikasi</h3>
-                <p className="text-indigo-100 text-[10px] sm:text-xs">Kirim email untuk tahapan rekrutmen kandidat</p>
-              </div>
-            </div>
+            <div className="flex items-center gap-3"><div className="p-2 bg-white/20 rounded-lg"><Send className="w-5 h-5" /></div><div><h3 className="font-extrabold text-base sm:text-lg">Kirim Email Notifikasi</h3><p className="text-indigo-100 text-[10px] sm:text-xs">Kirim email untuk tahapan rekrutmen kandidat</p></div></div>
             <button onClick={() => setSelectedCandidateEmail(null)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
           </div>
-
           <div className="p-4 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-black text-lg">{cand.nama.charAt(0)}</div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="font-extrabold text-slate-800 text-sm truncate">{cand.nama}</h4>
-                  <p className="text-xs text-slate-500 truncate">{cand.email}</p>
-                  <p className="text-[10px] text-slate-400 truncate">{cand.posisiDilamar}</p>
-                </div>
+                <div className="min-w-0 flex-1"><h4 className="font-extrabold text-slate-800 text-sm truncate">{cand.nama}</h4><p className="text-xs text-slate-500 truncate">{cand.email}</p><p className="text-[10px] text-slate-400 truncate">{cand.posisiDilamar}</p></div>
               </div>
             </div>
-
             <div>
               <label className="text-xs font-bold text-slate-600 block mb-2">Pilih Tahapan Email:</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
@@ -554,59 +482,28 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 ))}
               </div>
             </div>
-
             <div className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">Subject:</label>
-                <div className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">{replacedSubject}</div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">Isi Email:</label>
-                <div className="w-full text-xs font-medium px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[150px]">{replacedBody}</div>
-              </div>
-              {/* 🔹 TAHAP 3: Tampilkan pengirim berdasarkan currentUser */}
+              <div><label className="text-xs font-bold text-slate-600 block mb-1">Subject:</label><div className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">{replacedSubject}</div></div>
+              <div><label className="text-xs font-bold text-slate-600 block mb-1">Isi Email:</label><div className="w-full text-xs font-medium px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[150px]">{replacedBody}</div></div>
               <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-xs">
                 <p className="font-bold text-indigo-900 mb-1">Pengirim:</p>
                 <p className="text-indigo-700">{senderName} &lt;{senderEmail}&gt;</p>
-                {currentUser && (
-                  <p className="text-[10px] text-indigo-500 mt-1">📧 Menggunakan email akun Anda yang sedang login</p>
-                )}
+                {currentUser && <p className="text-[10px] text-indigo-500 mt-1">📧 Menggunakan email akun Anda yang sedang login</p>}
               </div>
             </div>
-
-            {/* INFO BOX: Pengganti Upload Section */}
             <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
                   <h5 className="font-bold text-xs text-amber-800 uppercase tracking-wider mb-1">Lampiran Dilakukan Secara Manual</h5>
-                  <p className="text-[11px] text-amber-700 leading-relaxed">
-                    Untuk alasan keamanan browser, lampiran file tidak dapat disertakan secara otomatis.
-                    Silakan gunakan tombol <strong>"Download CV"</strong> di tabel kandidat terlebih dahulu,
-                    kemudian lampirkan file secara manual setelah email terbuka.
-                  </p>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">Untuk alasan keamanan browser, lampiran file tidak dapat disertakan otomatis. Silakan gunakan tombol <strong>"Download CV"</strong> di tabel kandidat terlebih dahulu.</p>
                 </div>
               </div>
             </div>
           </div>
-
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
             <div className="flex items-center gap-3 ml-auto">
-              <button
-                type="button"
-                onClick={async () => {
-                  const textToCopy = `Kepada: ${cand.email}\nSubjek: ${replacedSubject}\n\n${replacedBody}`;
-                  try {
-                    await navigator.clipboard.writeText(textToCopy);
-                    alert('✅ Template email & alamat tujuan berhasil disalin ke clipboard.');
-                  } catch {
-                    alert('⚠️ Gagal menyalin. Silakan salin manual dari kolom Subject & Body di atas.');
-                  }
-                }}
-                className="px-3 py-2 border border-slate-300 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-100 transition-all flex items-center gap-1.5"
-              >
-                📋 Salin Template
-              </button>
+              <button type="button" onClick={async () => { const t = `Kepada: ${cand.email}\nSubjek: ${replacedSubject}\n\n${replacedBody}`; try { await navigator.clipboard.writeText(t); alert('✅ Template berhasil disalin.'); } catch { alert('⚠️ Gagal menyalin.'); } }} className="px-3 py-2 border border-slate-300 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-100 transition-all flex items-center gap-1.5">📋 Salin Template</button>
               <button onClick={() => setSelectedCandidateEmail(null)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">Batal</button>
               <button onClick={handleSendEmail} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20"><Send className="w-4 h-4" /> Kirim Email</button>
             </div>
@@ -752,10 +649,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
         <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-900/60 flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 my-4 sm:my-8">
             <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="font-extrabold text-slate-800 text-lg">{editingCandidate ? 'Ubah Data Pelamar' : 'Daftarkan Pelamar Baru'}</h3>
-                <p className="text-slate-400 text-xs mt-0.5">Lengkapi profil pelamar beserta riwayat pendidikan, gaji, dan tahapan rekrutmen.</p>
-              </div>
+              <div><h3 className="font-extrabold text-slate-800 text-lg">{editingCandidate ? 'Ubah Data Pelamar' : 'Daftarkan Pelamar Baru'}</h3><p className="text-slate-400 text-xs mt-0.5">Lengkapi profil pelamar beserta riwayat pendidikan, gaji, dan tahapan rekrutmen.</p></div>
               <button onClick={() => setIsModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleFormSubmit} className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
