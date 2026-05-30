@@ -495,15 +495,21 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 🔒 LOGIKA BARU: PAKSA MASUK KE MENU LOGIN GOOGLE BERBASIS EMAIL ADMIN
-        // Menggunakan endpoint ServiceLogin dengan parameter 'Email' dan 'continue' yang diarahkan langsung ke halaman Compose
+        // 🔒 SOLUSI MUTLAK: PAKSA TAMPILKAN MENU SELEKSI AKUN GOOGLE
+        // Menggunakan OAuth2 endpoint dengan parameter 'prompt=select_account' 
+        // dan 'login_hint' untuk memberi tahu Google akun mana yang WAJIB digunakan.
         
-        const finalComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
+        const finalComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         
-        const googleLoginMenuUrl = `https://accounts.google.com/ServiceLogin?service=mail&passive=true&Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(finalComposeUrl)}`;
+        // Parameter prompt=select_account memaksa Google memunculkan daftar email yang sedang login
+        const googleAccountMenuUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=dummy&redirect_uri=${encodeURIComponent(finalComposeUrl)}&response_type=none&scope=email&prompt=select_account&login_hint=${encodeURIComponent(senderEmail)}`;
 
-        // Buka menu login akun Google di tab baru
-        const newTab = window.open(googleLoginMenuUrl, '_blank');
+        // Trik bypass: Karena link di atas ditujukan langsung untuk interaksi Google, 
+        // kita juga bisa mengarahkan langsung ke AccountChooser milik Gmail:
+        const gmailChooserUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(finalComposeUrl)}`;
+
+        // Buka tab baru yang mengunci daftar akun
+        const newTab = window.open(gmailChooserUrl, '_blank');
 
         if (newTab) {
           setSelectedCandidateEmail(null); 
@@ -513,7 +519,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
           setSelectedCandidateEmail(null);
         }
       } else {
-        // Jalur Desktop Email Client (Outlook/Thunderbird)
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
         setSelectedCandidateEmail(null);
