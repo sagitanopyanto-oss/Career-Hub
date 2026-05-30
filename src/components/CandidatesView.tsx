@@ -117,14 +117,14 @@ window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank'
 
 const handleOpenAdd = () => {
 setEditingCandidate(null);
-setFormNama(''); setFormTelepon(''); setFormEmail(''); setFormGender('Laki-laki');
-setFormTempatLahir(''); setFormTanggalLahir('1998-01-01'); setFormPendidikan('S1');
+setFormNama(''); setFormTelepon(''); setFormEmail(''); setFormGender('Pilih Gender');
+setFormTempatLahir(''); setFormTanggalLahir('1998-01-01'); setFormPendidikan('Pilih Pendidikan');
 setFormJurusan(''); 
 // Set default position to first available job or empty
 setFormPosisiDilamar(jobs.length > 0 ? jobs[0].judul : '');
-setFormPengalaman(2); setFormStatusPekerjaan('Aktif Bekerja'); setFormJabatanTerakhir('');
-setFormCurrentSalary(0); setFormExpectedSalary(8000000); setFormTahapProses('applied');
-setFormRatingKecocokan(75); setFormCvName('CV_Resume.pdf'); setFormCvDataUrl('');
+setFormPengalaman(2); setFormStatusPekerjaan('Pilih Pekerjaan'); setFormJabatanTerakhir('');
+setFormCurrentSalary(0); setFormExpectedSalary(''); setFormTahapProses('Pilih Proses');
+setFormRatingKecocokan(75); setFormCvName(''); setFormCvDataUrl('');
 setFormCvMimeType(''); setFormKeterangan('');
 setFormTanggalApplied(new Date().toISOString().split('T')[0]);
 setFormTanggalScreening(''); setFormTanggalInterview(''); setFormTanggalAssessment('');
