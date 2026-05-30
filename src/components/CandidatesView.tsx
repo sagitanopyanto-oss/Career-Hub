@@ -116,20 +116,47 @@ window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank'
 };
 
 const handleOpenAdd = () => {
-setEditingCandidate(null);
-setFormNama(''); setFormTelepon(''); setFormEmail(''); setFormGender('Pilih Gender');
-setFormTempatLahir(''); setFormTanggalLahir('1998-01-01'); setFormPendidikan('Pilih Pendidikan');
-setFormJurusan(''); 
-// Set default position to first available job or empty
-setFormPosisiDilamar(jobs.length > 0 ? jobs[0].judul : '');
-setFormPengalaman(2); setFormStatusPekerjaan('Pilih Pekerjaan'); setFormJabatanTerakhir('');
-setFormCurrentSalary(0); setFormExpectedSalary(''); setFormTahapProses('Pilih Proses');
-setFormRatingKecocokan(75); setFormCvName(''); setFormCvDataUrl('');
-setFormCvMimeType(''); setFormKeterangan('');
-setFormTanggalApplied(new Date().toISOString().split('T')[0]);
-setFormTanggalScreening(''); setFormTanggalInterview(''); setFormTanggalAssessment('');
-setFormTanggalOffering(''); setFormTanggalMedical(''); setFormTanggalHired('');
-setIsModalOpen(true);
+    setEditingCandidate(null);
+    
+    // Reset fields to empty strings or defaults ONLY for placeholders
+    setFormNama(''); 
+    setFormTelepon(''); 
+    setFormEmail(''); 
+    setFormGender('Laki-laki'); // Gender tetap default karena butuh value valid untuk select
+    
+    setFormTempatLahir(''); 
+    setFormTanggalLahir('1998-01-01'); // Default date tetap dipertahankan agar user mudah edit
+    
+    // Pendidikan & Posisi Dikosongkan / Dihapus default valuenya
+    setFormPendidikan('S1'); // Opsional: Bisa diganti string kosong jika ingin user wajib pilih manual, tapi 'S1' aman sebagai default select
+    setFormJurusan(''); 
+    
+    // POSISI DILAMAR DIKOSONGKAN AGAR USER WAJIB MEMILIH
+    setFormPosisiDilamar(''); 
+
+    setFormPengalaman(0); // Gaji/Pengalaman direset ke 0
+    setFormStatusPekerjaan('Aktif Bekerja'); // Status kerja default
+    setFormJabatanTerakhir(''); 
+    
+    setFormCurrentSalary(0); 
+    setFormExpectedSalary(0); // Expected Salary direset ke 0 sesuai gambar
+    
+    setFormTahapProses('applied');
+    setFormRatingKecocokan(75); 
+    setFormCvName('CV_Resume.pdf'); // Nama file default boleh ada
+    setFormCvDataUrl('');
+    setFormCvMimeType(''); 
+    setFormKeterangan('');
+    
+    setFormTanggalApplied(new Date().toISOString().split('T')[0]);
+    setFormTanggalScreening(''); 
+    setFormTanggalInterview(''); 
+    setFormTanggalAssessment('');
+    setFormTanggalOffering(''); 
+    setFormTanggalMedical(''); 
+    setFormTanggalHired('');
+    
+    setIsModalOpen(true);
 };
 
 const handleOpenEdit = (cand: Candidate) => {
