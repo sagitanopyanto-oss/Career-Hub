@@ -26,6 +26,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   canCreate = true, canUpdate = true, canDelete = true,
   canEmail = true, canWhatsapp = true
 }) => {
+  // --- SEARCH & FILTER STATES ---
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStage, setFilterStage] = useState('All');
   const [filterGender, setFilterGender] = useState('All');
@@ -35,29 +36,33 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [filterUsia, setFilterUsia] = useState('All');
   const [filterExpectedSalary, setFilterExpectedSalary] = useState('All');
   
+  // 🔹 PERBAIKAN: State Filter Baru yang Sebelumnya Hilang
+  const [filterPosisi, setFilterPosisi] = useState('All');
+  const [filterPengalaman, setFilterPengalaman] = useState('All');
+
+  // --- MODAL & FORM STATES ---
   const [selectedCandidateATS, setSelectedCandidateATS] = useState<Candidate | null>(null);
   const [previewCV, setPreviewCV] = useState<Candidate | null>(null);
   const [selectedCandidateEmail, setSelectedCandidateEmail] = useState<Candidate | null>(null);
   const [emailStage, setEmailStage] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
-  
-  // Form States
+
+  // Form Fields
   const [formNama, setFormNama] = useState('');
   const [formTelepon, setFormTelepon] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formGender, setFormGender] = useState<'Laki-laki' | 'Perempuan' | ''>(''); // Default kosong
+  const [formGender, setFormGender] = useState<'Laki-laki' | 'Perempuan' | ''>('');
   const [formTempatLahir, setFormTempatLahir] = useState('');
-  const [formTanggalLahir, setFormTanggalLahir] = useState(''); // Default kosong
-  const [formPendidikan, setFormPendidikan] = useState<'D3' | 'S1' | 'S2' | 'SMA/SMK' | ''>(''); // Default kosong
+  const [formTanggalLahir, setFormTanggalLahir] = useState('');
+  const [formPendidikan, setFormPendidikan] = useState<'D3' | 'S1' | 'S2' | 'SMA/SMK' | ''>('');
   const [formJurusan, setFormJurusan] = useState('');
-  const [formPosisiDilamar, setFormPosisiDilamar] = useState(''); // Default kosong
-  const [formPengalaman, setFormPengalaman] = useState<number | ''>(''); // Default kosong
-  const [formStatusPekerjaan, setFormStatusPekerjaan] = useState<'Aktif Bekerja' | 'Tidak Bekerja' | 'Fresh graduate' | ''>(''); // Default kosong
+  const [formPosisiDilamar, setFormPosisiDilamar] = useState('');
+  const [formPengalaman, setFormPengalaman] = useState<number | ''>('');
+  const [formStatusPekerjaan, setFormStatusPekerjaan] = useState<'Aktif Bekerja' | 'Tidak Bekerja' | 'Fresh graduate' | ''>('');
   const [formJabatanTerakhir, setFormJabatanTerakhir] = useState('');
-  const [formCurrentSalary, setFormCurrentSalary] = useState<number | ''>(''); // Default kosong
-  const [formExpectedSalary, setFormExpectedSalary] = useState<number | ''>(''); // Default kosong
+  const [formCurrentSalary, setFormCurrentSalary] = useState<number | ''>('');
+  const [formExpectedSalary, setFormExpectedSalary] = useState<number | ''>('');
   const [formTahapProses, setFormTahapProses] = useState<'applied' | 'screening' | 'interview' | 'assessment' | 'offering' | 'medical' | 'hired' | 'rejected'>('applied');
   const [formRatingKecocokan, setFormRatingKecocokan] = useState(70);
   const [formCvName, setFormCvName] = useState('');
@@ -108,46 +113,20 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank');
   };
 
-  // 🔹 PERBAIKAN UTAMA: Reset Form ke Kosong/Placeholder
+  // 🔹 PERBAIKAN: Reset Form ke Kosong/Placeholder
   const handleOpenAdd = () => {
     setEditingCandidate(null);
-    
-    // Text inputs kosong
-    setFormNama(''); 
-    setFormTelepon(''); 
-    setFormEmail(''); 
-    setFormTempatLahir(''); 
-    setFormJurusan(''); 
-    setFormJabatanTerakhir(''); 
-    setFormCvName(''); 
-    setFormKeterangan('');
-    
-    // Select/Dropdown kosong (gunakan string kosong '')
-    setFormGender(''); 
-    setFormPendidikan(''); 
-    setFormPosisiDilamar(''); 
-    setFormStatusPekerjaan(''); 
-    
-    // Number inputs kosong (gunakan string kosong '' agar placeholder muncul)
-    setFormPengalaman(''); 
-    setFormCurrentSalary(''); 
-    setFormExpectedSalary(''); 
-    setFormRatingKecocokan(70); // Default rating tetap ada
-    
-    // Dates
+    setFormNama(''); setFormTelepon(''); setFormEmail(''); 
+    setFormTempatLahir(''); setFormJurusan(''); setFormJabatanTerakhir(''); 
+    setFormCvName(''); setFormKeterangan('');
+    setFormGender(''); setFormPendidikan(''); setFormPosisiDilamar(''); setFormStatusPekerjaan('');
+    setFormPengalaman(''); setFormCurrentSalary(''); setFormExpectedSalary('');
+    setFormRatingKecocokan(70);
     setFormTanggalLahir(''); 
     setFormTanggalApplied(new Date().toISOString().split('T')[0]);
-    setFormTanggalScreening(''); 
-    setFormTanggalInterview(''); 
-    setFormTanggalAssessment('');
-    setFormTanggalOffering(''); 
-    setFormTanggalMedical(''); 
-    setFormTanggalHired('');
-    
-    // Files
-    setFormCvDataUrl('');
-    setFormCvMimeType('');
-
+    setFormTanggalScreening(''); setFormTanggalInterview(''); setFormTanggalAssessment('');
+    setFormTanggalOffering(''); setFormTanggalMedical(''); setFormTanggalHired('');
+    setFormCvDataUrl(''); setFormCvMimeType('');
     setIsModalOpen(true);
   };
 
@@ -189,14 +168,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       } else {
         element.href = cand.cvDataUrl;
         element.download = cand.cvName;
-        element.target = '_blank'; 
+        element.target = '_blank';
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
       }
       return;
     }
-    // Mock PDF fallback
     const mockContent = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 44>>stream\nBT /F1 12 Tf 50 700 Td (CV - ${cand.nama}) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000266 00000 n \n0000000359 00000 n \ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n415\n%%EOF`;
     const blob = new Blob([mockContent], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -210,13 +188,10 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNama.trim() || !formEmail.trim()) return;
-    
-    // Validasi sederhana untuk field wajib lainnya jika perlu
-    
+
     let calculatedRating = formRatingKecocokan;
     if (!editingCandidate && !calculatedRating) {
-       // Auto-calculate if empty and new candidate
-       calculatedRating = Math.min(100, Math.max(45, 55 + ((Number(formPengalaman)||0) * 5)));
+      calculatedRating = Math.min(100, Math.max(45, 55 + ((Number(formPengalaman)||0) * 5)));
     }
 
     const candData: Candidate = {
@@ -240,21 +215,36 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     setIsModalOpen(false);
   };
 
+  // 🔹 PERBAIKAN: Logika Filter Lengkap Termasuk Posisi & Pengalaman
   const filteredCandidates = candidates.filter(c => {
     const matchesSearch = c.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.posisiDilamar.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.id.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesStage = filterStage === 'All' || c.tahapProses === filterStage;
     const matchesGender = filterGender === 'All' || c.gender === filterGender;
     const matchesPendidikan = filterPendidikan === 'All' || c.pendidikan === filterPendidikan;
     const matchesStatusKerja = filterStatusKerja === 'All' || c.statusPekerjaan === filterStatusKerja;
+    
+    // Filter Posisi Lowongan
+    const matchesPosisi = filterPosisi === 'All' || c.posisiDilamar === filterPosisi;
+    
+    // Filter Pengalaman Kerja
+    const matchesPengalaman = filterPengalaman === 'All' || (
+      filterPengalaman === '<1' ? c.pengalaman < 1 :
+      filterPengalaman === '1-3' ? c.pengalaman >= 1 && c.pengalaman <= 3 :
+      filterPengalaman === '4-6' ? c.pengalaman >= 4 && c.pengalaman <= 6 :
+      filterPengalaman === '7+' ? c.pengalaman >= 7 : true
+    );
+
     const matchesAts = filterAtsScore === 'All' || (
       filterAtsScore === '85+' ? c.ratingKecocokan >= 85 :
       filterAtsScore === '70-84' ? c.ratingKecocokan >= 70 && c.ratingKecocokan < 85 :
       filterAtsScore === '50-69' ? c.ratingKecocokan >= 50 && c.ratingKecocokan < 70 :
       filterAtsScore === 'below50' ? c.ratingKecocokan < 50 : true
     );
+    
     const usia = hitungUsia(c.tanggalLahir);
     const matchesUsia = filterUsia === 'All' || (
       filterUsia === '<25' ? usia < 25 :
@@ -262,6 +252,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       filterUsia === '31-35' ? usia >= 31 && usia <= 35 :
       filterUsia === '>35' ? usia > 35 : true
     );
+    
     const matchesExpectedSalary = filterExpectedSalary === 'All' || (
       filterExpectedSalary === '<5' ? c.expectedSalary < 5000000 :
       filterExpectedSalary === '5-10' ? c.expectedSalary >= 5000000 && c.expectedSalary < 10000000 :
@@ -269,7 +260,10 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       filterExpectedSalary === '15-20' ? c.expectedSalary >= 15000000 && c.expectedSalary < 20000000 :
       filterExpectedSalary === '>20' ? c.expectedSalary >= 20000000 : true
     );
-    return matchesSearch && matchesStage && matchesGender && matchesPendidikan && matchesStatusKerja && matchesAts && matchesUsia && matchesExpectedSalary;
+
+    return matchesSearch && matchesStage && matchesGender && matchesPendidikan && 
+           matchesStatusKerja && matchesPosisi && matchesPengalaman && 
+           matchesAts && matchesUsia && matchesExpectedSalary;
   });
 
   // ─── ATS ANALYSIS MODAL ──────────────────────────────────────────────
@@ -296,11 +290,8 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 <p className="text-indigo-200 text-[10px]">Verifikasi otomatis dokumen & profil pelamar</p>
               </div>
             </div>
-            <button onClick={() => setSelectedCandidateATS(null)} className="p-1.5 hover:bg-indigo-800 rounded-lg text-indigo-100 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+            <button onClick={() => setSelectedCandidateATS(null)} className="p-1.5 hover:bg-indigo-800 rounded-lg text-indigo-100 transition-colors"><X className="w-5 h-5" /></button>
           </div>
-
           <div className="p-4 sm:p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
               <div>
@@ -315,7 +306,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 </div>
               </div>
             </div>
-
             <div className={`p-4 rounded-xl border flex items-start gap-3 ${meetsThreshold ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
               {meetsThreshold ? <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
               <div>
@@ -327,34 +317,27 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 </p>
               </div>
             </div>
-
             <div className="space-y-2.5">
               <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase block">SKILL MATCH ANALYSIS</span>
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-1.5">
                   <span className="text-[11px] text-slate-400 w-full font-bold">Keahlian Sesuai:</span>
-                  {matchedSkills.map((s, i) => (
-                    <span key={i} className="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">✓ {s}</span>
-                  ))}
+                  {matchedSkills.map((s, i) => (<span key={i} className="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">✓ {s}</span>))}
                   {matchedSkills.length === 0 && <span className="text-slate-400 text-xs italic">Tidak ada keahlian yang terdeteksi cocok.</span>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-slate-100">
                   <span className="text-[11px] text-slate-400 w-full font-bold">Keahlian Kurang (Gap):</span>
-                  {missingSkills.map((s, i) => (
-                    <span key={i} className="bg-rose-50 text-rose-700 font-bold text-[10px] px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1">✗ {s}</span>
-                  ))}
+                  {missingSkills.map((s, i) => (<span key={i} className="bg-rose-50 text-rose-700 font-bold text-[10px] px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1">✗ {s}</span>))}
                   {missingSkills.length === 0 && <span className="text-slate-400 text-xs italic">Semua keahlian terpenuhi!</span>}
                 </div>
               </div>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100 text-xs">
               <div><span className="text-slate-400 block">Pendidikan Formal</span><span className="font-bold text-slate-800">{cand.pendidikan} ({cand.jurusan || 'Jurusan Umum'})</span></div>
               <div><span className="text-slate-400 block">Masa Kerja & Posisi Terakhir</span><span className="font-bold text-slate-800">{cand.pengalaman} Tahun - {cand.jabatanTerakhir || 'Fresh Graduate'}</span></div>
               <div><span className="text-slate-400 block">Current Salary</span><span className="font-bold text-slate-800">{formatRupiah(cand.currentSalary || 0)}</span></div>
               <div><span className="text-slate-400 block">Expected Salary</span><span className="font-bold text-slate-800">{formatRupiah(cand.expectedSalary)}</span></div>
             </div>
-
             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-1">
               <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block">REKOMENDASI SISTEM</span>
               <p className="text-xs text-slate-700 leading-relaxed font-semibold italic">
@@ -366,7 +349,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               </p>
             </div>
           </div>
-
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-end">
             <button onClick={() => setSelectedCandidateATS(null)} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all">Tutup Analisis</button>
           </div>
@@ -538,7 +520,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
           </div>
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
             <div className="flex items-center gap-3 ml-auto">
-              <button type="button" onClick={async () => { const t = `Kepada: ${cand.email}\nSubjek: ${replacedSubject}\n\n${replacedBody}`; try { await navigator.clipboard.writeText(t); alert('✅ Template berhasil disalin.'); } catch {  alert('⚠️ Gagal menyalin.'); } }} className="px-3 py-2 border border-slate-300 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-100 transition-all flex items-center gap-1.5">📋 Salin Template</button>
+              <button type="button" onClick={async () => { const t = `Kepada: ${cand.email}\nSubjek: ${replacedSubject}\n\n${replacedBody}`; try { await navigator.clipboard.writeText(t); alert('✅ Template berhasil disalin.'); } catch { alert('⚠️ Gagal menyalin.'); } }} className="px-3 py-2 border border-slate-300 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-100 transition-all flex items-center gap-1.5">📋 Salin Template</button>
               <button onClick={() => setSelectedCandidateEmail(null)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">Batal</button>
               <button onClick={handleSendEmail} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20"><Send className="w-4 h-4" /> Kirim Email</button>
             </div>
@@ -561,29 +543,46 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
         </button>
       </div>
 
+      {/* 🔹 PERBAIKAN: Filter Bar Lengkap dengan Posisi & Pengalaman */}
       <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
           <input type="text" placeholder="Cari kandidat berdasarkan nama, email, posisi, ID pelamar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full text-xs font-semibold pl-9 pr-3 py-3 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" />
         </div>
+        
+        {/* Grid Filter Utama */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
           <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Tahap Proses</label><select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Tahap</option>{stages.map(stg => (<option key={stg} value={stg} className="capitalize">{stg === 'medical' ? 'Medical Check' : stg.charAt(0).toUpperCase() + stg.slice(1)}</option>))}</select></div>
+          
+          {/* 🔹 FILTER POSISI LOWONGAN */}
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Posisi Lowongan</label><select value={filterPosisi} onChange={(e) => setFilterPosisi(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Posisi</option>{jobs.map(job => (<option key={job.id} value={job.judul}>{job.judul}</option>))}</select></div>
+          
+          {/* 🔹 FILTER PENGALAMAN KERJA */}
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Pengalaman (Thn)</label><select value={filterPengalaman} onChange={(e) => setFilterPengalaman(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua</option><option value="<1">&lt; 1 Tahun</option><option value="1-3">1 - 3 Tahun</option><option value="4-6">4 - 6 Tahun</option><option value="7+">&gt; 7 Tahun</option></select></div>
+
           <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Gender</label><select value={filterGender} onChange={(e) => setFilterGender(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Gender</option><option value="Laki-laki">Laki-Laki</option><option value="Perempuan">Perempuan</option></select></div>
           <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Pendidikan</label><select value={filterPendidikan} onChange={(e) => setFilterPendidikan(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Pendidikan</option><option value="SMA/SMK">SMA/SMK</option><option value="D3">D3</option><option value="S1">S1</option><option value="S2">S2</option></select></div>
           <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Status Pekerjaan</label><select value={filterStatusKerja} onChange={(e) => setFilterStatusKerja(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Status</option><option value="Aktif Bekerja">Aktif Bekerja</option><option value="Tidak Bekerja">Tidak Bekerja</option><option value="Fresh graduate">Fresh Graduate</option></select></div>
           <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Skor ATS</label><select value={filterAtsScore} onChange={(e) => setFilterAtsScore(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Skor</option><option value="85+">Excellent (85%+)</option><option value="70-84">Good (70-84%)</option><option value="50-69">Fair (50-69%)</option><option value="below50">Low (&lt;50%)</option></select></div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Usia</label><select value={filterUsia} onChange={(e) => setFilterUsia(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Usia</option><option value="<25">&lt; 25 Tahun</option><option value="25-30">25 - 30 Tahun</option><option value="31-35">31 - 35 Tahun</option><option value=">35">&gt; 35 Tahun</option></select></div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Expected Salary</label><select value={filterExpectedSalary} onChange={(e) => setFilterExpectedSalary(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Gaji</option><option value="<5">&lt; 5 Juta</option><option value="5-10">5 - 10 Juta</option><option value="10-15">10 - 15 Juta</option><option value="15-20">15 - 20 Juta</option><option value=">20">&gt; 20 Juta</option></select></div>
         </div>
-        {(filterStage !== 'All' || filterGender !== 'All' || filterPendidikan !== 'All' || filterStatusKerja !== 'All' || filterAtsScore !== 'All' || filterUsia !== 'All' || filterExpectedSalary !== 'All') && (
+
+        {/* Grid Filter Tambahan */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3">
+           <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Usia</label><select value={filterUsia} onChange={(e) => setFilterUsia(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Usia</option><option value="<25">&lt; 25 Tahun</option><option value="25-30">25 - 30 Tahun</option><option value="31-35">31 - 35 Tahun</option><option value=">35">&gt; 35 Tahun</option></select></div>
+           <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Expected Salary</label><select value={filterExpectedSalary} onChange={(e) => setFilterExpectedSalary(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white cursor-pointer"><option value="All">Semua Gaji</option><option value="<5">&lt; 5 Juta</option><option value="5-10">5 - 10 Juta</option><option value="10-15">10 - 15 Juta</option><option value="15-20">15 - 20 Juta</option><option value=">20">&gt; 20 Juta</option></select></div>
+        </div>
+
+        {/* Active Filters Info & Reset */}
+        {(filterStage !== 'All' || filterGender !== 'All' || filterPendidikan !== 'All' || filterStatusKerja !== 'All' || filterAtsScore !== 'All' || filterUsia !== 'All' || filterExpectedSalary !== 'All' || filterPosisi !== 'All' || filterPengalaman !== 'All') && (
           <div className="flex items-center gap-2 text-[10px] text-slate-500 font-semibold pt-1 border-t border-slate-100">
             <Filter className="w-3 h-3 text-indigo-500" />
-            <span>Filter aktif: {[filterStage, filterGender, filterPendidikan, filterStatusKerja, filterAtsScore, filterUsia, filterExpectedSalary].filter(f => f !== 'All').length} pilihan</span>
-            <button onClick={() => { setFilterStage('All'); setFilterGender('All'); setFilterPendidikan('All'); setFilterStatusKerja('All'); setFilterAtsScore('All'); setFilterUsia('All'); setFilterExpectedSalary('All'); }} className="text-indigo-600 hover:underline ml-1">Reset Semua</button>
+            <span>Filter aktif: {[filterStage, filterGender, filterPendidikan, filterStatusKerja, filterAtsScore, filterUsia, filterExpectedSalary, filterPosisi, filterPengalaman].filter(f => f !== 'All').length} pilihan</span>
+            <button onClick={() => { setFilterStage('All'); setFilterGender('All'); setFilterPendidikan('All'); setFilterStatusKerja('All'); setFilterAtsScore('All'); setFilterUsia('All'); setFilterExpectedSalary('All'); setFilterPosisi('All'); setFilterPengalaman('All'); }} className="text-indigo-600 hover:underline ml-1">Reset Semua</button>
           </div>
         )}
       </div>
 
+      {/* Candidates Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-left text-xs border-collapse min-w-[1250px]">
@@ -693,29 +692,29 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Email <span className="text-red-500">*</span></label><input type="email" required placeholder="budi@email.com" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Nomor Telepon <span className="text-red-500">*</span></label><input type="text" required placeholder="0812XXXXXXXX" value={formTelepon} onChange={(e) => setFormTelepon(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* 🔹 PERBAIKAN: Dropdown dengan Placeholder */}
+                {/* Dropdown dengan Placeholder */}
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Gender <span className="text-red-500">*</span></label><select required value={formGender} onChange={(e) => setFormGender(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="" disabled>Pilih Salah Satu</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select></div>
                 
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Tempat Lahir <span className="text-red-500">*</span></label><input type="text" required placeholder="Contoh: Jakarta" value={formTempatLahir} onChange={(e) => setFormTempatLahir(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Tanggal Lahir <span className="text-red-500">*</span></label><input type="date" required value={formTanggalLahir} onChange={(e) => setFormTanggalLahir(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* 🔹 PERBAIKAN: Dropdown Posisi dengan Placeholder */}
+                {/* Dropdown Posisi dengan Placeholder */}
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Posisi Dilamar <span className="text-red-500">*</span></label><select required value={formPosisiDilamar} onChange={(e) => setFormPosisiDilamar(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="" disabled>Pilih Posisi Lowongan</option>{jobs.map(job => (<option key={job.id} value={job.judul}>{job.judul}</option>))}</select></div>
                 
-                {/* 🔹 PERBAIKAN: Dropdown Status dengan Placeholder */}
+                {/* Dropdown Status dengan Placeholder */}
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Status Pekerjaan Saat Ini <span className="text-red-500">*</span></label><select required value={formStatusPekerjaan} onChange={(e) => setFormStatusPekerjaan(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="" disabled>Pilih Status Pekerjaan</option><option value="Aktif Bekerja">Aktif Bekerja</option><option value="Tidak Bekerja">Tidak Bekerja</option><option value="Fresh graduate">Fresh graduate</option></select></div>
                 
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Jabatan/Posisi Terakhir <span className="text-red-500">*</span></label><input type="text" required placeholder="Contoh: Frontend Developer" value={formJabatanTerakhir} onChange={(e) => setFormJabatanTerakhir(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* 🔹 PERBAIKAN: Input Angka dengan Placeholder Contoh */}
+                {/* Input Angka dengan Placeholder Contoh */}
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Masa Kerja / Pengalaman (Tahun) <span className="text-red-500">*</span></label><input type="number" required min="0" placeholder="Contoh: 2" value={formPengalaman} onChange={(e) => setFormPengalaman(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* 🔹 PERBAIKAN: Dropdown Pendidikan dengan Placeholder */}
+                {/* Dropdown Pendidikan dengan Placeholder */}
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Pendidikan Terakhir <span className="text-red-500">*</span></label><select required value={formPendidikan} onChange={(e) => setFormPendidikan(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="" disabled>Pilih Pendidikan</option><option value="SMA/SMK">SMA/SMK</option><option value="D3">D3</option><option value="S1">S1</option><option value="S2">S2</option></select></div>
                 
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Jurusan Pendidikan <span className="text-red-500">*</span></label><input type="text" required placeholder="Teknik Informatika / DKV" value={formJurusan} onChange={(e) => setFormJurusan(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* 🔹 PERBAIKAN: Input Gaji dengan Placeholder Contoh */}
+                {/* Input Gaji dengan Placeholder Contoh */}
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Current Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" placeholder="Contoh: 1000000" value={formCurrentSalary} onChange={(e) => setFormCurrentSalary(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Expected Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" placeholder="Contoh: 1000000" value={formExpectedSalary} onChange={(e) => setFormExpectedSalary(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
