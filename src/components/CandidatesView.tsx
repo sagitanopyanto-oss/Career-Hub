@@ -26,7 +26,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   canCreate = true, canUpdate = true, canDelete = true,
   canEmail = true, canWhatsapp = true
 }) => {
-  // --- STATE FILTERS ---
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStage, setFilterStage] = useState('All');
   const [filterGender, setFilterGender] = useState('All');
@@ -35,15 +34,15 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [filterAtsScore, setFilterAtsScore] = useState('All');
   const [filterUsia, setFilterUsia] = useState('All');
   const [filterExpectedSalary, setFilterExpectedSalary] = useState('All');
-
+  
   const [selectedCandidateATS, setSelectedCandidateATS] = useState<Candidate | null>(null);
   const [previewCV, setPreviewCV] = useState<Candidate | null>(null);
   const [selectedCandidateEmail, setSelectedCandidateEmail] = useState<Candidate | null>(null);
   const [emailStage, setEmailStage] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
-
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
-
+  
   // Form States
   const [formNama, setFormNama] = useState('');
   const [formTelepon, setFormTelepon] = useState('');
@@ -54,14 +53,11 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [formPendidikan, setFormPendidikan] = useState<'D3' | 'S1' | 'S2' | 'SMA/SMK'>('S1');
   const [formJurusan, setFormJurusan] = useState('');
   const [formPosisiDilamar, setFormPosisiDilamar] = useState('');
-  
-  // 🔹 PERBAIKAN: State numeric diinisialisasi dengan 0 agar konsisten
   const [formPengalaman, setFormPengalaman] = useState(0); 
   const [formStatusPekerjaan, setFormStatusPekerjaan] = useState<'Aktif Bekerja' | 'Tidak Bekerja' | 'Fresh graduate'>('Aktif Bekerja');
   const [formJabatanTerakhir, setFormJabatanTerakhir] = useState('');
   const [formCurrentSalary, setFormCurrentSalary] = useState(0);
   const [formExpectedSalary, setFormExpectedSalary] = useState(0); 
-  
   const [formTahapProses, setFormTahapProses] = useState<'applied' | 'screening' | 'interview' | 'assessment' | 'offering' | 'medical' | 'hired' | 'rejected'>('applied');
   const [formRatingKecocokan, setFormRatingKecocokan] = useState(70);
   const [formCvName, setFormCvName] = useState('CV_Resume.pdf');
@@ -82,33 +78,27 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
 
   const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
-  // Helper: Hitung Usia
+  // 🔹 PERBAIKAN: Fungsi untuk menghilangkan leading zero saat input angka
+  const handleNumericInput = (setter: React.Dispatch<React.SetStateAction<number>>, value: string) => {
+    if (value === '') {
+      setter(0); // Jika kosong, set ke 0
+      return;
+    }
+    // Hapus karakter non-digit
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    // Konversi ke Number (otomatis menghilangkan leading zero, misal "01" jadi 1)
+    const numValue = parseInt(cleanValue, 10);
+    setter(isNaN(numValue) ? 0 : numValue);
+  };
+
   const hitungUsia = (tglLahir?: string): number => {
     if (!tglLahir) return 0;
     const birthDate = new Date(tglLahir);
-    const today = new Date('2026-02-28'); // Mock date
+    const today = new Date('2026-02-28');
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return age;
-  };
-
-  // 🔹 PERBAIKAN UTAMA: Fungsi untuk menangani input angka tanpa leading zero
-  const handleNumericInput = (setter: React.Dispatch<React.SetStateAction<number>>, value: string) => {
-    // Jika kosong, set ke 0
-    if (value === '') {
-      setter(0);
-      return;
-    }
-    
-    // Hapus karakter non-digit
-    const cleanValue = value.replace(/[^0-9]/g, '');
-    
-    // Konversi ke Number (ini otomatis menghilangkan leading zero, misal "01" jadi 1)
-    const numValue = parseInt(cleanValue, 10);
-    
-    // Simpan hasil integer (jika NaN maka 0)
-    setter(isNaN(numValue) ? 0 : numValue);
   };
 
   const openWhatsApp = (cand: Candidate) => {
@@ -123,6 +113,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     let phone = cand.telepon.replace(/[^0-9]/g, '');
     if (phone.startsWith('0')) phone = '62' + phone.substring(1);
     else if (!phone.startsWith('62')) phone = '62' + phone;
+
     const draft = settings.whatsappSettings.confirmationTemplate
       .replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar)
       .replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
@@ -134,16 +125,9 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     setEditingCandidate(null);
     setFormNama(''); setFormTelepon(''); setFormEmail(''); setFormGender('Laki-laki');
     setFormTempatLahir(''); setFormTanggalLahir('1998-01-01'); setFormPendidikan('S1');
-    setFormJurusan(''); 
-    setFormPosisiDilamar(jobs.length > 0 ? jobs[0].judul : '');
-    
-    // Reset numeric fields to 0
-    setFormPengalaman(0); 
-    setFormStatusPekerjaan('Aktif Bekerja'); setFormJabatanTerakhir('');
-    setFormCurrentSalary(0); 
-    setFormExpectedSalary(0); 
-    
-    setFormTahapProses('applied');
+    setFormJurusan(''); setFormPosisiDilamar(jobs.length > 0 ? jobs[0].judul : '');
+    setFormPengalaman(0); setFormStatusPekerjaan('Aktif Bekerja'); setFormJabatanTerakhir('');
+    setFormCurrentSalary(0); setFormExpectedSalary(0); setFormTahapProses('applied');
     setFormRatingKecocokan(75); setFormCvName('CV_Resume.pdf'); setFormCvDataUrl('');
     setFormCvMimeType(''); setFormKeterangan('');
     setFormTanggalApplied(new Date().toISOString().split('T')[0]);
@@ -238,25 +222,21 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     setIsModalOpen(false);
   };
 
-  // --- FILTERING LOGIC ---
   const filteredCandidates = candidates.filter(c => {
     const matchesSearch = c.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.posisiDilamar.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.id.toLowerCase().includes(searchTerm.toLowerCase());
-
     const matchesStage = filterStage === 'All' || c.tahapProses === filterStage;
     const matchesGender = filterGender === 'All' || c.gender === filterGender;
     const matchesPendidikan = filterPendidikan === 'All' || c.pendidikan === filterPendidikan;
     const matchesStatusKerja = filterStatusKerja === 'All' || c.statusPekerjaan === filterStatusKerja;
-
     const matchesAts = filterAtsScore === 'All' || (
       filterAtsScore === '85+' ? c.ratingKecocokan >= 85 :
       filterAtsScore === '70-84' ? c.ratingKecocokan >= 70 && c.ratingKecocokan < 85 :
       filterAtsScore === '50-69' ? c.ratingKecocokan >= 50 && c.ratingKecocokan < 70 :
       filterAtsScore === 'below50' ? c.ratingKecocokan < 50 : true
     );
-
     const usia = hitungUsia(c.tanggalLahir);
     const matchesUsia = filterUsia === 'All' || (
       filterUsia === '<25' ? usia < 25 :
@@ -264,7 +244,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       filterUsia === '31-35' ? usia >= 31 && usia <= 35 :
       filterUsia === '>35' ? usia > 35 : true
     );
-
     const matchesExpectedSalary = filterExpectedSalary === 'All' || (
       filterExpectedSalary === '<5' ? c.expectedSalary < 5000000 :
       filterExpectedSalary === '5-10' ? c.expectedSalary >= 5000000 && c.expectedSalary < 10000000 :
@@ -272,12 +251,10 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       filterExpectedSalary === '15-20' ? c.expectedSalary >= 15000000 && c.expectedSalary < 20000000 :
       filterExpectedSalary === '>20' ? c.expectedSalary >= 20000000 : true
     );
-
     return matchesSearch && matchesStage && matchesGender && matchesPendidikan && matchesStatusKerja && matchesAts && matchesUsia && matchesExpectedSalary;
   });
 
-  // --- RENDER FUNCTIONS ---
-
+  // ─── ATS ANALYSIS MODAL ──────────────────────────────────────────────
   const renderATSPanel = (cand: Candidate) => {
     const matchedJob = jobs.find(j => j.judul === cand.posisiDilamar || j.id === cand.posisiDilamar) || jobs[0];
     const jobSkills = matchedJob ? matchedJob.skills : ["React", "TypeScript", "Tailwind CSS"];
@@ -380,6 +357,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     );
   };
 
+  // ─── CV PREVIEW MODAL ────────────────────────────────────────────────
   const renderCVPreview = (cand: Candidate) => {
     const matchedJob = jobs.find(j => j.judul === cand.posisiDilamar || j.id === cand.posisiDilamar);
     return (
@@ -394,9 +372,9 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               <div className="bg-indigo-900 text-white p-6 sm:p-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div><h1 className="text-2xl sm:text-3xl font-black tracking-tight">{cand.nama}</h1><p className="text-indigo-200 font-semibold mt-1">{cand.jabatanTerakhir || cand.posisiDilamar}</p></div>
                 <div className="text-right flex flex-col gap-1 text-xs text-indigo-100">
-                  <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">✉</span> {cand.email}</span>
-                  <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">☎</span> {cand.telepon}</span>
-                  <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">⚐</span> Indonesia</span>
+                  <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">✉</span>{cand.email}</span>
+                  <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">☎</span>{cand.telepon}</span>
+                  <span className="flex items-center sm:justify-end gap-2"><span className="w-4 text-center">⚐</span>Indonesia</span>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-100">
@@ -435,13 +413,9 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                   {cand.cvDataUrl && (
                     <div><h3 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Dokumen Terlampir</h3>
                       <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
-                        {cand.cvMimeType?.includes('image') ? (
-                          <img src={cand.cvDataUrl} alt={cand.cvName} className="w-full max-h-[320px] object-contain bg-white" />
-                        ) : cand.cvMimeType?.includes('pdf') ? (
-                          <iframe src={cand.cvDataUrl} title={cand.cvName} className="w-full h-[320px] bg-white" />
-                        ) : (
-                          <div className="p-6 text-center text-xs text-slate-500">Preview tidak tersedia untuk format ini. Silakan gunakan tombol download untuk membuka dokumen.</div>
-                        )}
+                        {cand.cvMimeType?.includes('image') ? (<img src={cand.cvDataUrl} alt={cand.cvName} className="w-full max-h-[320px] object-contain bg-white" />)
+                          : cand.cvMimeType?.includes('pdf') ? (<iframe src={cand.cvDataUrl} title={cand.cvName} className="w-full h-[320px] bg-white" />)
+                            : (<div className="p-6 text-center text-xs text-slate-500">Preview tidak tersedia untuk format ini. Silakan gunakan tombol download untuk membuka dokumen.</div>)}
                       </div>
                     </div>
                   )}
@@ -458,11 +432,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     );
   };
 
+  // ─── EMAIL MODAL ─────────────────────────────────────────────────────
   const renderEmailModal = (cand: Candidate) => {
     const template = settings.emailSettings.templates[emailStage];
     const replacedSubject = template.subject.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
     const replacedBody = template.body.replace(/{nama}/g, cand.nama).replace(/{posisi}/g, cand.posisiDilamar).replace(/{email}/g, cand.email).replace(/{telepon}/g, cand.telepon);
     
+    // Gunakan email user login jika tersedia, fallback ke settings global
     const senderName = currentUser?.nama || settings.emailSettings.senderName;
     const senderEmail = currentUser?.email || settings.emailSettings.senderEmail;
 
@@ -476,9 +452,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       try {
         const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
         isGoogleLoggedIn = response.type === 'opaque' || response.ok;
-      } catch {
-        isGoogleLoggedIn = false;
-      }
+      } catch { isGoogleLoggedIn = false; }
       
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
@@ -655,14 +629,14 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                             const isCurrentStep = step.key === cand.tahapProses;
                             const isPast = step.date !== undefined && step.date !== '';
                             const nextStep = ['applied', 'screening', 'interview', 'assessment', 'offering', 'medical', 'hired'].indexOf(cand.tahapProses);
-                             const stepIndex = ['applied', 'screening', 'interview', 'assessment', 'offering', 'medical', 'hired'].indexOf(step.key);
+                            const stepIndex = ['applied', 'screening', 'interview', 'assessment', 'offering', 'medical', 'hired'].indexOf(step.key);
                             const isCompleted = stepIndex < nextStep || (stepIndex <= nextStep && isPast);
                             return (
-                               <div key={step.key} className={`flex items-center gap-1.5 ${isCurrentStep ? 'bg-indigo-50 px-1 py-0.5 rounded -mx-1' : ''}`}>
-                                 <div className={`w-2.5 h-2.5 rounded-full shrink-0 border ${isCompleted ? 'bg-emerald-500 border-emerald-300' : isCurrentStep ? 'bg-indigo-500 border-indigo-300 animate-pulse' : 'bg-slate-200 border-slate-300'}`} />
-                                 <span className={`text-[9px] w-14 shrink-0 ${isCurrentStep ? 'font-bold text-indigo-700' : isCompleted ? 'font-semibold text-slate-600' : 'text-slate-300'}`}>{step.label}</span>
-                                 <span className={`text-[9px] ${step.date ? 'text-slate-500 font-semibold' : 'text-slate-300'}`}>{step.date || '—'}</span>
-                               </div>
+                              <div key={step.key} className={`flex items-center gap-1.5 ${isCurrentStep ? 'bg-indigo-50 px-1 py-0.5 rounded -mx-1' : ''}`}>
+                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 border ${isCompleted ? 'bg-emerald-500 border-emerald-300' : isCurrentStep ? 'bg-indigo-500 border-indigo-300 animate-pulse' : 'bg-slate-200 border-slate-300'}`} />
+                                <span className={`text-[9px] w-14 shrink-0 ${isCurrentStep ? 'font-bold text-indigo-700' : isCompleted ? 'font-semibold text-slate-600' : 'text-slate-300'}`}>{step.label}</span>
+                                <span className={`text-[9px] ${step.date ? 'text-slate-500 font-semibold' : 'text-slate-300'}`}>{step.date || '—'}</span>
+                              </div>
                             );
                           })}
                         </div>
@@ -681,7 +655,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                   );
                 })
               ) : (
-                 <tr><td colSpan={13} className="p-8 text-center text-slate-400">Tidak ada data kandidat ditemukan.</td></tr>
+                <tr><td colSpan={13} className="p-8 text-center text-slate-400">Tidak ada data kandidat ditemukan.</td></tr>
               )}
             </tbody>
           </table>
@@ -711,15 +685,15 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Status Pekerjaan Saat Ini <span className="text-red-500">*</span></label><select required value={formStatusPekerjaan} onChange={(e) => setFormStatusPekerjaan(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Aktif Bekerja">Aktif Bekerja</option><option value="Tidak Bekerja">Tidak Bekerja</option><option value="Fresh graduate">Fresh graduate</option></select></div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Jabatan/Posisi Terakhir <span className="text-red-500">*</span></label><input type="text" required placeholder="Contoh: Frontend Developer" value={formJabatanTerakhir} onChange={(e) => setFormJabatanTerakhir(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* 🔹 PERBAIKAN UX: Input Numerik Tanpa Leading Zero */}
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Masa Kerja / Pengalaman (Tahun) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formPengalaman} onChange={(e) => handleNumericInput(setFormPengalaman, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                {/* 🔹 PERBAIKAN: Input Angka Tanpa Leading Zero */}
+                <div><label className="text-xs font-bold text-slate-600 block mb-1">Masa Kerja / Pengalaman (Tahun) <span className="text-red-500">*</span></label><input type="text" inputMode="numeric" required value={formPengalaman === 0 ? '' : formPengalaman} onChange={(e) => handleNumericInput(setFormPengalaman, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Pendidikan Terakhir <span className="text-red-500">*</span></label><select required value={formPendidikan} onChange={(e) => setFormPendidikan(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="D3">D3</option><option value="S1">S1</option><option value="S2">S2</option><option value="SMA/SMK">SMA/SMK</option></select></div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Jurusan Pendidikan <span className="text-red-500">*</span></label><input type="text" required placeholder="Teknik Informatika / DKV" value={formJurusan} onChange={(e) => setFormJurusan(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* 🔹 PERBAIKAN UX: Input Gaji Tanpa Leading Zero */}
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Current Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formCurrentSalary} onChange={(e) => handleNumericInput(setFormCurrentSalary, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Expected Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formExpectedSalary} onChange={(e) => handleNumericInput(setFormExpectedSalary, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                {/* 🔹 PERBAIKAN: Input Angka Tanpa Leading Zero */}
+                <div><label className="text-xs font-bold text-slate-600 block mb-1">Current Salary (IDR) <span className="text-red-500">*</span></label><input type="text" inputMode="numeric" required value={formCurrentSalary === 0 ? '' : formCurrentSalary} onChange={(e) => handleNumericInput(setFormCurrentSalary, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                <div><label className="text-xs font-bold text-slate-600 block mb-1">Expected Salary (IDR) <span className="text-red-500">*</span></label><input type="text" inputMode="numeric" required value={formExpectedSalary === 0 ? '' : formExpectedSalary} onChange={(e) => handleNumericInput(setFormExpectedSalary, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Nama Berkas CV (PDF/DOCX)</label><input type="text" value={formCvName} onChange={(e) => setFormCvName(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 <div>
@@ -729,4 +703,33 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                   {formCvDataUrl && (<p className="mt-1 text-[10px] font-semibold text-emerald-600">Dokumen siap disimpan: {formCvName}</p>)}
                 </div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Tahap Proses</label><select value={formTahapProses} onChange={(e) => setFormTahapProses(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white font-bold">{stages.map(stg => (<option key={stg} value={stg}>{stg}</option>))}</select></div>
-                {editingCandidate && (<div><label className="text-xs font-bold text-slate-600 block mb-1">ATS Score / Rating Kecocokan (%)</label><input type="number" min={0} max={100} value={formRatingKecocokan} onChange={(e) => setFormRatingKecocokan(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-
+                {editingCandidate && (<div><label className="text-xs font-bold text-slate-600 block mb-1">ATS Score / Rating Kecocokan (%)</label><input type="number" min={0} max={100} value={formRatingKecocokan} onChange={(e) => setFormRatingKecocokan(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>)}
+              </div>
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                <span className="text-xs font-extrabold text-slate-400 tracking-wider uppercase block">Tanggal Transaksi Tahapan</span>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div><label className="text-[10px] font-bold text-slate-500 block mb-0.5">Apply Date</label><input type="date" required value={formTanggalApplied} onChange={(e) => setFormTanggalApplied(e.target.value)} className="w-full text-[10px] font-semibold px-2 py-1.5 border border-slate-200 rounded text-slate-700" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-500 block mb-0.5">Screening Date</label><input type="date" value={formTanggalScreening} onChange={(e) => setFormTanggalScreening(e.target.value)} className="w-full text-[10px] font-semibold px-2 py-1.5 border border-slate-200 rounded text-slate-700" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-500 block mb-0.5">Interview Date</label><input type="date" value={formTanggalInterview} onChange={(e) => setFormTanggalInterview(e.target.value)} className="w-full text-[10px] font-semibold px-2 py-1.5 border border-slate-200 rounded text-slate-700" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-500 block mb-0.5">Assessment Date</label><input type="date" value={formTanggalAssessment} onChange={(e) => setFormTanggalAssessment(e.target.value)} className="w-full text-[10px] font-semibold px-2 py-1.5 border border-slate-200 rounded text-slate-700" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-500 block mb-0.5">Medical Date</label><input type="date" value={formTanggalMedical} onChange={(e) => setFormTanggalMedical(e.target.value)} className="w-full text-[10px] font-semibold px-2 py-1.5 border border-slate-200 rounded text-slate-700" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-500 block mb-0.5">Offering Date</label><input type="date" value={formTanggalOffering} onChange={(e) => setFormTanggalOffering(e.target.value)} className="w-full text-[10px] font-semibold px-2 py-1.5 border border-slate-200 rounded text-slate-700" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-500 block mb-0.5">Hired Date</label><input type="date" value={formTanggalHired} onChange={(e) => setFormTanggalHired(e.target.value)} className="w-full text-[10px] font-semibold px-2 py-1.5 border border-slate-200 rounded text-slate-700" /></div>
+                </div>
+              </div>
+              <div><label className="text-xs font-bold text-slate-600 block mb-1">Catatan Keterangan HR</label><textarea rows={2} placeholder="Catatan tambahan mengenai interview, hasil tes, dll..." value={formKeterangan} onChange={(e) => setFormKeterangan(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+              <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 p-4 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">Batal</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/10 transition-all">{editingCandidate ? 'Simpan Perubahan' : 'Daftarkan Pelamar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {selectedCandidateATS && renderATSPanel(selectedCandidateATS)}
+      {previewCV && renderCVPreview(previewCV)}
+      {selectedCandidateEmail && renderEmailModal(selectedCandidateEmail)}
+    </div>
+  );
+};
