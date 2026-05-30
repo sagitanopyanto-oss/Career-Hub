@@ -485,23 +485,14 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      const isGmailWeb = /gmail\.com|googlemail\.com/i.test(senderEmail);
-      let isGoogleLoggedIn = false;
-      try {
-        const response = await fetch('https://mail.google.com/favicon.ico', { mode: 'no-cors' });
-        isGoogleLoggedIn = response.type === 'opaque' || response.ok;
-      } catch { isGoogleLoggedIn = false; }
-      
-      const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
+      // 🔍 DETEKSI AKURAT: Memeriksa apakah EMAIL ADMIN menggunakan Gmail atau domain lain (Outlook/Perusahaan)
+      const useGmailCompose = /gmail\.com|googlemail\.com/i.test(senderEmail);
 
       if (useGmailCompose) {
-        // 🔒 SOLUSI MUTLAK GMAIL: PAKSA TAMPILKAN MENU SELEKSI AKUN GOOGLE
+        // 🔒 JALUR GMAIL WEB (OTOMATIS VIA ACCOUNT CHOOSER)
         const finalComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        
-        // Tautan diarahkan langsung ke AccountChooser milik Gmail untuk validasi otomatis
         const gmailChooserUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(finalComposeUrl)}`;
 
-        // Buka tab baru yang mengunci daftar akun
         const newTab = window.open(gmailChooserUrl, '_blank');
 
         if (newTab) {
@@ -512,8 +503,8 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
           setSelectedCandidateEmail(null);
         }
       } else {
-        // 🖥️ JALUR DESKTOP NEW REVISION (OUTLOOK / THUNDERBIRD)
-        // Karena sistem web tidak bisa mengecek background app desktop, kita gunakan interseptor konfirmasi manual
+        // 🖥️ JALUR DESKTOP EMAIL (OUTLOOK / THUNDERBIRD / DOMAIN PERUSAHAAN)
+        // Di sini Gmail Web tidak akan pernah terbuka lagi karena jalur dipisahkan total
         const konfirmasiDesktop = confirm(
           `🖥️ DETEKSI APLIKASI DESKTOP (OUTLOOK/THUNDERBIRD)\n\n` +
           `Sistem akan membuka aplikasi email desktop Anda.\n` +
@@ -524,9 +515,9 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
         );
 
         if (konfirmasiDesktop) {
-          // ✅ KONDISI 1 (TRUE): Admin mengonfirmasi akun desktop sudah sama
+          // ✅ KONDISI 1 (TRUE): Admin mengonfirmasi akun desktop sudah sama, buka Outlook
           const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-          window.open(mailtoLink, '_blank');
+          window.open(mailtoLink, '_self'); // Menggunakan _self agar tidak membuka tab browser kosong baru
           setSelectedCandidateEmail(null);
         } else {
           // ❌ KONDISI 2 (FALSE): Admin membatalkan karena akun di aplikasi desktop berbeda
@@ -535,8 +526,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
             `Tindakan: Pembukaan Outlook/Thunderbird diblokir.\n` +
             `Silakan sesuaikan/pindah akun di aplikasi desktop Anda terlebih dahulu.`
           );
-          // Menghentikan proses secara mutlak, aplikasi desktop TIDAK AKAN TERBUKA
-          return; 
+          return; // Menghentikan proses secara mutlak
         }
       }
     };
