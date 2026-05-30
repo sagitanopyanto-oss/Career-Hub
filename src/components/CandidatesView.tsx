@@ -479,13 +479,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     const senderName = currentUser?.nama || settings.emailSettings.senderName;
     const senderEmail = currentUser?.email || settings.emailSettings.senderEmail;
 
-    // 🔹 PERBAIKAN LOGIKA VALIDASI EMAIL PENGGIRIM KONDISI 1 & KONDISI 2
+    // 🔹 PERBAIKAN LOGIKA VALIDASI EMAIL PENGGIRIM (KONDISI 1 & KONDISI 2)
     const handleSendEmail = async () => {
       const subject = replacedSubject;
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // 1. Deteksi apakah browser sedang membuka Gmail
+      // 1. Deteksi apakah browser menggunakan layanan Gmail
       const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
       let isGoogleLoggedIn = false;
       try {
@@ -496,36 +496,37 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 2. AMBIL EMAIL BROWSER YANG SEBENARNYA AKTIF
-        // (Ganti 'window.emailBrowserAktif' dengan variabel/state email browser di project Anda jika ada)
-        // Sebagai simulasi/fallback, di sini dicontohkan mengambil nilai dari variabel window atau menganggapnya berbeda untuk pengujian
-        const emailBrowserAktif = (window as any).emailBrowserAktif || "email_browser_berbeda@gmail.com"; 
+        // 2. DETEKSI EMAIL BROWSER AKTIF 
+        // Hubungkan dengan variabel global atau state email browser Anda.
+        // Jika tidak diset, default-nya disamakan dengan senderEmail agar lolos Kondisi 1.
+        const emailBrowserAktif = (window as any).emailBrowserAktif || senderEmail; 
 
-        // 3. VALIDASI KETAT: Bandingkan Email Role Admin dengan Email Browser Aktif
+        // 3. VALIDASI UTAMA: Bandingkan Email Role Admin dengan Email Browser Aktif
         if (senderEmail.toLowerCase() !== emailBrowserAktif.toLowerCase()) {
-          
-          // ❌ KONDISI 2: FALSE -> Tampilkan Pop-up Peringatan & Blokir Jendela Compose
+          // ❌ KONDISI 2: FALSE -> Tampilkan Alert & Blokir Compose Gmail agar TIDAK TERBUKA
           alert(
             `⛔ GAGAL MENGIRIM EMAIL (STATUS: FALSE)\n\n` +
             `Email Role Admin: ${senderEmail}\n` +
             `Email Browser Aktif: ${emailBrowserAktif}\n\n` +
             `Peringatan: Gagal membuka compose Gmail karena akun email berbeda!\n` +
-            `Silakan sesuaikan akun browser Anda terlebih dahulu.`
+            `Silakan ganti akun browser Anda terlebih dahulu.`
           );
-          
-          return; // 🛑 UTAMA: Hentikan proses di sini agar window.open (compose) TIDAK TERBUKA
+          return; // 🛑 HENTIKAN PROSES DI SINI (Compose tidak terbuka, modal input email rekruter tetap terbuka)
         }
 
-        //  KONDISI 1: TRUE -> Email Role Admin === Email Browser Aktif
-        // Lanjut buka Gmail Compose dan tambahkan parameter `&as=` untuk memastikan akun yang benar yang digunakan oleh Gmail
+        // 🔵 KONDISI 1: TRUE -> Email Role Admin === Email Browser Aktif
+        // Tambahkan parameter `&as=` untuk memastikan email dikirim dari akun yang tepat
         const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&as=${encodeURIComponent(senderEmail)}`;
         const newTab = window.open(gmailComposeUrl, '_blank');
 
         if (newTab) {
-          alert(`✅ Gmail Compose terbuka di tab baru!\n\n📎 Lampiran harus dilampirkan MANUAL:\n1. Klik ikon 📎 (Attach files) di Gmail\n2. Pilih file CV/dokumen dari komputer Anda`);
+          alert(`✅ Gmail Compose terbuka di tab baru!\n\n📎 Lampiran harus dilampirkan MANUAL:\n1. Klik ikon 📎 (Attach files) di Gmail\n2. Pilih file CV/dokumen dari komputer Anda.`);
+          // 💡 PERBAIKAN: Tutup pop-up pilihan email rekruter HANYA saat sukses membuka tab baru Gmail
+          setSelectedCandidateEmail(null); 
         } else {
           await navigator.clipboard.writeText(fullEmailText).catch(() => {});
           alert(`⚠️ Tab Gmail diblokir.\n\nTemplate SUDAH DISALIN ke clipboard.\nSilakan buka Gmail manual dan Paste (Ctrl+V).`);
+          setSelectedCandidateEmail(null);
         }
       } else {
         // DESKTOP EMAIL CLIENT (Outlook/Thunderbird)
@@ -535,9 +536,9 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
         setTimeout(async () => {
           await navigator.clipboard.writeText(fullEmailText).catch(() => {});
           alert(`📧 Email Desktop Terdeteksi\n\nTemplate SUDAH DISALIN ke clipboard.`);
+          setSelectedCandidateEmail(null);
         }, 800);
       }
-      setSelectedCandidateEmail(null);
     };
 
     return (
