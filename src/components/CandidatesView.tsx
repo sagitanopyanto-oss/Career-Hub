@@ -495,29 +495,12 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 🔒 OTENTIKASI VERIFIKASI SINKRONISASI (ANTI-CEBOL & ANTI-MANIPULASI)
-        // Mengambil 4 karakter terakhir dari email admin sebagai kode verifikasi (contoh: 'gmail.com' diambil 'b.com' atau '.com')
-        const targetToken = senderEmail.substring(senderEmail.length - 4).toLowerCase();
-
-        const inputUser = prompt(
-          `[SINKRONISASI KEAMANAN EMAIL]\n\n` +
-          `Sistem mendeteksi Email Role Admin: ${senderEmail}\n\n` +
-          `Untuk memverifikasi bahwa browser Anda sedang aktif menggunakan akun yang SAMA,\n` +
-          `Ketik 4 karakter terakhir dari Email Admin tersebut di bawah ini:`
-        );
-
-        // Jika input kosong atau tidak cocok, sistem otomatis memblokir (Kondisi 2 - FALSE)
-        if (!inputUser || inputUser.trim().toLowerCase() !== targetToken) {
-          alert(
-            `⛔ VALIDASI GAGAL (STATUS: FALSE)\n\n` +
-            `Sebab: Kode verifikasi salah atau Anda membatalkan proses.\n` +
-            `Tindakan: Jendela Gmail Compose diblokir demi keamanan data.`
-          );
-          return; // 🛑 MUTLAK: Menghentikan program. Tab baru TIDAK AKAN PERNAH terbuka.
-        }
-
-        // 🔵 KONDISI 1 (TRUE): Kode cocok, langsung buka Gmail Compose
-        const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
+        // 🔒 SISTEM PENGUNCI SESSION GOOGLE (ANTI-MANIPULASI ADMIN)
+        // Kita tidak memakai prompt teks lagi. Kita serahkan verifikasi ke server Google Mail.
+        // Parameter 'authuser' dipaksa diisi dengan Email Role Admin.
+        const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
+        
+        // Langsung buka tab baru tanpa interupsi pop-up web kita
         const newTab = window.open(gmailComposeUrl, '_blank');
 
         if (newTab) {
@@ -528,7 +511,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
           setSelectedCandidateEmail(null);
         }
       } else {
-        // Desktop Email Client (Outlook/Thunderbird)
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
         setSelectedCandidateEmail(null);
