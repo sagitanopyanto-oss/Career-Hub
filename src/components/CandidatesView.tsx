@@ -485,11 +485,11 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // 🔍 DETEKSI AKURAT: Memeriksa apakah EMAIL ADMIN menggunakan Gmail atau domain lain (Outlook/Perusahaan)
+      // 🔍 DETEKSI RELEVAN: Memeriksa apakah EMAIL ADMIN menggunakan Gmail atau bukan
       const useGmailCompose = /gmail\.com|googlemail\.com/i.test(senderEmail);
 
       if (useGmailCompose) {
-        // 🔒 JALUR GMAIL WEB (OTOMATIS VIA ACCOUNT CHOOSER)
+        // 🔒 JALUR GMAIL WEB
         const finalComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         const gmailChooserUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(finalComposeUrl)}`;
 
@@ -503,8 +503,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
           setSelectedCandidateEmail(null);
         }
       } else {
-        // 🖥️ JALUR DESKTOP EMAIL (OUTLOOK / THUNDERBIRD / DOMAIN PERUSAHAAN)
-        // Di sini Gmail Web tidak akan pernah terbuka lagi karena jalur dipisahkan total
+        // 🖥️ JALUR DESKTOP EMAIL (OUTLOOK / THUNDERBIRD)
         const konfirmasiDesktop = confirm(
           `🖥️ DETEKSI APLIKASI DESKTOP (OUTLOOK/THUNDERBIRD)\n\n` +
           `Sistem akan membuka aplikasi email desktop Anda.\n` +
@@ -515,18 +514,26 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
         );
 
         if (konfirmasiDesktop) {
-          // ✅ KONDISI 1 (TRUE): Admin mengonfirmasi akun desktop sudah sama, buka Outlook
+          // ✅ KONDISI 1 (TRUE): Gunakan trik iFrame tersembunyi agar browser tidak membuka tab baru 
+          // dan murni melemparkan perintah ke aplikasi sistem komputer Anda.
           const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-          window.open(mailtoLink, '_self'); // Menggunakan _self agar tidak membuka tab browser kosong baru
+          
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = mailtoLink;
+          document.body.appendChild(iframe);
+          
+          // Hapus iframe setelah memicu aplikasi desktop
+          setTimeout(() => document.body.removeChild(iframe), 100);
+          
           setSelectedCandidateEmail(null);
         } else {
-          // ❌ KONDISI 2 (FALSE): Admin membatalkan karena akun di aplikasi desktop berbeda
+          // ❌ KONDISI 2 (FALSE)
           alert(
             `⛔ VALIDASI DIBATALKAN (STATUS: FALSE)\n\n` +
-            `Tindakan: Pembukaan Outlook/Thunderbird diblokir.\n` +
-            `Silakan sesuaikan/pindah akun di aplikasi desktop Anda terlebih dahulu.`
+            `Tindakan: Pembukaan Outlook/Thunderbird diblokir.`
           );
-          return; // Menghentikan proses secara mutlak
+          return;
         }
       }
     };
