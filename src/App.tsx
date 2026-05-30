@@ -135,6 +135,7 @@ export default function App() {
     }
   }, [settings.adminRoles, currentUser, currentRole]);
   ));
+  
   const [schedules, setSchedules] = useState<InterviewSchedule[]>((() =>
     getStoredData<InterviewSchedule[]>('careerhub_interviews', INITIAL_INTERVIEWS)
   ));
