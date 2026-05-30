@@ -495,40 +495,43 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 🔒 FIX TOTAL KONDISI 1 (TRUE) & KONDISI 2 (FALSE)
-        // Kita menggunakan parameter tautan berlapis 'authuser' & 'as' langsung ke URL parameter Google
-        const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&as=${encodeURIComponent(senderEmail)}&authuser=${encodeURIComponent(senderEmail)}`;
+        // 🔒 DETEKSI NYATA AKUN BROWSER (ANTI-MANIPULASI ADMIN)
+        // Membuat elemen gambar bayangan untuk mengecek apakah session email tersebut aktif di Google cookie browser
+        const imgCheck = new Image();
         
-        // Membuka jendela compose secara native
-        const newTab = window.open(gmailComposeUrl, '_blank');
+        // Mengarahkan ke validasi URL email spesifik milik Google
+        imgCheck.src = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/images/cleardot.gif?v=${Date.now()}`;
 
-        if (newTab) {
-          // Menjalankan pengecekan interval di latar belakang untuk mendeteksi crash session
-          const checkSessionInterval = setInterval(() => {
-            try {
-              // Jika terdeteksi kondisi mismatch oleh sistem browser, halaman akan redirect atau blank
-              if (newTab.location && newTab.location.href.includes("AccountChooser")) {
-                newTab.close(); // Otomatis tutup tab jika dilempar ke halaman ganti akun (Kondisi 2)
-                clearInterval(checkSessionInterval);
-                alert(`⛔ KONDISI 2 (FALSE): Jendela Compose ditutup otomatis karena Email Browser tidak sesuai dengan ${senderEmail}!`);
-              }
-            } catch (e) {
-              // Blok catch aman jika cross-origin policy browser memblokir pembacaan URL
-            }
-          }, 500);
+        // Jika Gambar Berhasil Dimuat -> KONDISI 1: Email cocok & sudah login di browser (TRUE)
+        imgCheck.onload = () => {
+          const gmailComposeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(senderEmail)}/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&authuser=${encodeURIComponent(senderEmail)}`;
+          const newTab = window.open(gmailComposeUrl, '_blank');
 
-          // Berikan instruksi konfirmasi akhir tanpa merusak Kondisi 1
-          setTimeout(() => {
-            clearInterval(checkSessionInterval);
-          }, 5000);
+          if (newTab) {
+            setSelectedCandidateEmail(null);
+          } else {
+            navigator.clipboard.writeText(fullEmailText).catch(() => {});
+            alert(`⚠️ Tab Gmail diblokir browser. Template disalin ke clipboard.`);
+            setSelectedCandidateEmail(null);
+          }
+        };
 
-          setSelectedCandidateEmail(null); 
-        } else {
-          await navigator.clipboard.writeText(fullEmailText).catch(() => {});
-          alert(`⚠️ Tab Gmail diblokir browser. Template disalin ke clipboard.`);
-          setSelectedCandidateEmail(null);
-        }
+        // Jika Gambar Gagal Dimuat -> KONDISI 2: Email berbeda / Belum login di browser (FALSE)
+        imgCheck.onerror = () => {
+          // ❌ BLOKIR TOTAL & PAKSA LOGIN
+          alert(
+            `⛔ VALIDASI GAGAL (STATUS: FALSE)\n\n` +
+            `Sebab: Akun browser Anda saat ini BERBEDA dengan Email Role Admin (${senderEmail}) atau Anda belum login ke akun tersebut!\n\n` +
+            `Tindakan: Jendela Compose Gmail diblokir demi keamanan data.`
+          );
+          
+          // Mengarahkan admin langsung ke halaman login Google untuk akun tersebut agar menyamakan session
+          const loginUrl = `https://accounts.google.com/ServiceLogin?service=mail&passive=true&Email=${encodeURIComponent(senderEmail)}&continue=${encodeURIComponent(window.location.href)}`;
+          window.open(loginUrl, '_blank');
+        };
+
       } else {
+        // Desktop Email Client (Outlook/Thunderbird)
         const mailtoLink = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoLink, '_blank');
         setSelectedCandidateEmail(null);
