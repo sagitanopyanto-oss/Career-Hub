@@ -53,11 +53,11 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   const [formPendidikan, setFormPendidikan] = useState<'D3' | 'S1' | 'S2' | 'SMA/SMK'>('S1');
   const [formJurusan, setFormJurusan] = useState('');
   const [formPosisiDilamar, setFormPosisiDilamar] = useState('');
-  const [formPengalaman, setFormPengalaman] = useState(0); // Reset ke 0
+  const [formPengalaman, setFormPengalaman] = useState(0); 
   const [formStatusPekerjaan, setFormStatusPekerjaan] = useState<'Aktif Bekerja' | 'Tidak Bekerja' | 'Fresh graduate'>('Aktif Bekerja');
   const [formJabatanTerakhir, setFormJabatanTerakhir] = useState('');
   const [formCurrentSalary, setFormCurrentSalary] = useState(0);
-  const [formExpectedSalary, setFormExpectedSalary] = useState(0); // Reset ke 0
+  const [formExpectedSalary, setFormExpectedSalary] = useState(0); 
   const [formTahapProses, setFormTahapProses] = useState<'applied' | 'screening' | 'interview' | 'assessment' | 'offering' | 'medical' | 'hired' | 'rejected'>('applied');
   const [formRatingKecocokan, setFormRatingKecocokan] = useState(70);
   const [formCvName, setFormCvName] = useState('CV_Resume.pdf');
@@ -78,14 +78,17 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
 
   const formatRupiah = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
-  const hitungUsia = (tglLahir?: string): number => {
-    if (!tglLahir) return 0;
-    const birthDate = new Date(tglLahir);
-    const today = new Date('2026-02-28');
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
+  // Helper untuk membersihkan leading zero saat input berubah
+  const handleNumericChange = (setter: React.Dispatch<React.SetStateAction<number>>, value: string) => {
+    if (value === '') {
+      setter(0);
+      return;
+    }
+    // Hapus karakter non-digit
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    // Konversi ke Number (otomatis menghilangkan leading zero, misal "01" jadi 1)
+    const numValue = parseInt(cleanValue, 10);
+    setter(isNaN(numValue) ? 0 : numValue);
   };
 
   const openWhatsApp = (cand: Candidate) => {
@@ -108,7 +111,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft)}`, '_blank');
   };
 
-  // ─── PERBAIKAN UTAMA DI SINI ──────────────────────────────────────
   const handleOpenAdd = () => {
     setEditingCandidate(null);
     
@@ -152,7 +154,6 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     
     setIsModalOpen(true);
   };
-  // ──────────────────────────────────────────────────────────────────
 
   const handleOpenEdit = (cand: Candidate) => {
     setEditingCandidate(cand);
@@ -238,6 +239,16 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     if (editingCandidate) onUpdateCandidate(candData);
     else onAddCandidate(candData);
     setIsModalOpen(false);
+  };
+
+  const hitungUsia = (tglLahir?: string): number => {
+    if (!tglLahir) return 0;
+    const birthDate = new Date(tglLahir);
+    const today = new Date('2026-02-28');
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age;
   };
 
   const filteredCandidates = candidates.filter(c => {
@@ -711,15 +722,15 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Status Pekerjaan Saat Ini <span className="text-red-500">*</span></label><select required value={formStatusPekerjaan} onChange={(e) => setFormStatusPekerjaan(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="Aktif Bekerja">Aktif Bekerja</option><option value="Tidak Bekerja">Tidak Bekerja</option><option value="Fresh graduate">Fresh graduate</option></select></div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Jabatan/Posisi Terakhir <span className="text-red-500">*</span></label><input type="text" required placeholder="Contoh: Frontend Developer" value={formJabatanTerakhir} onChange={(e) => setFormJabatanTerakhir(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* Pengalaman Reset ke 0 */}
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Masa Kerja / Pengalaman (Tahun) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formPengalaman} onChange={(e) => setFormPengalaman(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                {/* Pengalaman Reset ke 0 & No Leading Zero */}
+                <div><label className="text-xs font-bold text-slate-600 block mb-1">Masa Kerja / Pengalaman (Tahun) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formPengalaman} onChange={(e) => handleNumericChange(setFormPengalaman, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Pendidikan Terakhir <span className="text-red-500">*</span></label><select required value={formPendidikan} onChange={(e) => setFormPendidikan(e.target.value as any)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700 bg-white"><option value="D3">D3</option><option value="S1">S1</option><option value="S2">S2</option><option value="SMA/SMK">SMA/SMK</option></select></div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Jurusan Pendidikan <span className="text-red-500">*</span></label><input type="text" required placeholder="Teknik Informatika / DKV" value={formJurusan} onChange={(e) => setFormJurusan(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
-                {/* Gaji Reset ke 0 */}
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Current Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formCurrentSalary} onChange={(e) => setFormCurrentSalary(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
-                <div><label className="text-xs font-bold text-slate-600 block mb-1">Expected Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formExpectedSalary} onChange={(e) => setFormExpectedSalary(Number(e.target.value))} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                {/* Gaji Reset ke 0 & No Leading Zero */}
+                <div><label className="text-xs font-bold text-slate-600 block mb-1">Current Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formCurrentSalary} onChange={(e) => handleNumericChange(setFormCurrentSalary, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
+                <div><label className="text-xs font-bold text-slate-600 block mb-1">Expected Salary (IDR) <span className="text-red-500">*</span></label><input type="number" required min="0" value={formExpectedSalary} onChange={(e) => handleNumericChange(setFormExpectedSalary, e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">Nama Berkas CV (PDF/DOCX)</label><input type="text" value={formCvName} onChange={(e) => setFormCvName(e.target.value)} className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-700" /></div>
                 <div>
