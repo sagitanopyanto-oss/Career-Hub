@@ -485,7 +485,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const body = replacedBody;
       const fullEmailText = `Kepada: ${cand.email}\nSubjek: ${subject}\n\n${body}`;
 
-      // 1. Deteksi apakah browser menggunakan Gmail
+      // 1. Deteksi apakah browser sedang membuka Gmail
       const isGmailWeb = /gmail\.com|googlemail\.com/i.test(cand.email);
       let isGoogleLoggedIn = false;
       try {
@@ -496,32 +496,33 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       const useGmailCompose = isGmailWeb || isGoogleLoggedIn;
 
       if (useGmailCompose) {
-        // 2. VALIDASI UTAMA: Ambil email Browser yang aktif 
-        // (Ganti 'window.emailBrowserAktif' dengan state/variabel email browser asli di app Anda jika ada)
-        // Sebagai fallback aman, jika tidak terdeteksi, kita minta konfirmasi / asumsikan nilainya untuk divalidasi.
-        const emailBrowserAktif = (window as any).emailBrowserAktif || senderEmail; 
+        // 2. AMBIL EMAIL BROWSER YANG SEBENARNYA AKTIF
+        // (Ganti 'window.emailBrowserAktif' dengan variabel/state email browser di project Anda jika ada)
+        // Sebagai simulasi/fallback, di sini dicontohkan mengambil nilai dari variabel window atau menganggapnya berbeda untuk pengujian
+        const emailBrowserAktif = (window as any).emailBrowserAktif || "email_browser_berbeda@gmail.com"; 
 
-        // Verifikasi kesamaan Akun: Email Role Admin (senderEmail) harus SAMA dengan Email Browser Aktif
+        // 3. VALIDASI KETAT: Bandingkan Email Role Admin dengan Email Browser Aktif
         if (senderEmail.toLowerCase() !== emailBrowserAktif.toLowerCase()) {
-          // ❌ KONDISI 2: FALSE -> Tampilkan Pop-up & Blokir Compose Gmail agar TIDAK TERBUKA
+          
+          // ❌ KONDISI 2: FALSE -> Tampilkan Pop-up Peringatan & Blokir Jendela Compose
           alert(
-            `⛔ GAGAL MENGIRIM EMAIL (KONDISI FALSE)\n\n` +
+            `⛔ GAGAL MENGIRIM EMAIL (STATUS: FALSE)\n\n` +
             `Email Role Admin: ${senderEmail}\n` +
             `Email Browser Aktif: ${emailBrowserAktif}\n\n` +
             `Peringatan: Gagal membuka compose Gmail karena akun email berbeda!\n` +
-            `Silakan ganti akun browser Anda atau sesuaikan pengaturan admin Anda.`
+            `Silakan sesuaikan akun browser Anda terlebih dahulu.`
           );
-          return; // 🛑 HENTIKAN PROSES DI SINI (Compose tidak akan terbuka)
+          
+          return; // 🛑 UTAMA: Hentikan proses di sini agar window.open (compose) TIDAK TERBUKA
         }
 
         //  KONDISI 1: TRUE -> Email Role Admin === Email Browser Aktif
-        // Lanjut buka Gmail Compose menggunakan parameter tambahan `&as=${encodeURIComponent(senderEmail)}` 
-        // untuk memastikan Gmail menggunakan akun yang tepat.
+        // Lanjut buka Gmail Compose dan tambahkan parameter `&as=` untuk memastikan akun yang benar yang digunakan oleh Gmail
         const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cand.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&as=${encodeURIComponent(senderEmail)}`;
         const newTab = window.open(gmailComposeUrl, '_blank');
 
         if (newTab) {
-          alert(`✅ Gmail Compose terbuka di tab baru!\n\n📎 Lampiran harus dilampirkan MANUAL:\n1. Klik ikon 📎 di Gmail\n2. Pilih file CV dari komputer Anda.`);
+          alert(`✅ Gmail Compose terbuka di tab baru!\n\n📎 Lampiran harus dilampirkan MANUAL:\n1. Klik ikon 📎 (Attach files) di Gmail\n2. Pilih file CV/dokumen dari komputer Anda`);
         } else {
           await navigator.clipboard.writeText(fullEmailText).catch(() => {});
           alert(`⚠️ Tab Gmail diblokir.\n\nTemplate SUDAH DISALIN ke clipboard.\nSilakan buka Gmail manual dan Paste (Ctrl+V).`);
