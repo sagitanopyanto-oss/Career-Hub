@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Settings, Sparkles, CalendarDays, Clock, DollarSign, Save, CheckCircle2,
   Users, Plus, Edit3, Trash2, ShieldCheck, X, Target, MessageCircle,
-  Eye, EyeOff, Lock
+  Eye, EyeOff, Lock, Mail
 } from 'lucide-react';
 import { AppSettings, SlaSetting, AdminRole, BudgetSetting } from '../data/mockData';
 
@@ -16,12 +16,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [syncGoogleCalendar, setSyncGoogleCalendar] = useState(settings.syncGoogleCalendar);
   const [targetSlaDays, setTargetSlaDays] = useState<SlaSetting[]>([...settings.targetSlaDays]);
   const [targetSlaManagement, setTargetSlaManagement] = useState(settings.targetSlaManagement ?? 85);
-  
-  // Department Budgets State with Multi-Year Support
+
   const [deptBudgets, setDeptBudgets] = useState<BudgetSetting[]>(
     settings.budgetCostHiring.map(b => ({ ...b, year: b.year || new Date().getFullYear() }))
   );
-  
   const [adminRoles, setAdminRoles] = useState<AdminRole[]>(settings.adminRoles.map((role) => ({ ...role })));
   const [infoPortal, setInfoPortal] = useState<AppSettings['infoPortal']>({ ...settings.infoPortal });
   const [emailSettings, setEmailSettings] = useState<AppSettings['emailSettings']>({
@@ -37,11 +35,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   });
   const [activeEmailTemplate, setActiveEmailTemplate] = useState<'interview' | 'assessment' | 'offering' | 'medical' | 'onboarding' | 'rejected'>('interview');
   const [whatsappSettings, setWhatsappSettings] = useState<AppSettings['whatsappSettings']>({ ...settings.whatsappSettings });
-  
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveSection, setSaveSection] = useState('');
 
-  // Modal States
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
@@ -50,8 +46,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [newDeptYear, setNewDeptYear] = useState<number>(new Date().getFullYear());
   const [newDeptBudget, setNewDeptBudget] = useState<number>(0);
 
-  // Role Form State
   const [roleFormName, setRoleFormName] = useState('');
+  const [roleFormEmail, setRoleFormEmail] = useState(''); // 🔹 BARU
   const [roleFormAccess, setRoleFormAccess] = useState<AdminRole['accessLevel']>('Recruiter');
   const [roleFormStatus, setRoleFormStatus] = useState<AdminRole['status']>('Active');
   const [roleFormDescription, setRoleFormDescription] = useState('');
@@ -79,7 +75,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     });
   };
 
-  // Budget CRUD Logic (Supports Edit Year & Zero Budget)
+  // Budget CRUD Logic
   const openAddBudgetModal = () => {
     setEditingBudgetKey(null);
     setNewDeptName('');
@@ -102,20 +98,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     const trimmedName = newDeptName.trim();
     const oldKey = editingBudgetKey;
     const newKey = `${trimmedName}-${newDeptYear}`;
-
-    const isDuplicate = deptBudgets.some(b => 
-      b.department.toLowerCase() === trimmedName.toLowerCase() && 
-      b.year === newDeptYear && 
+    const isDuplicate = deptBudgets.some(b =>
+      b.department.toLowerCase() === trimmedName.toLowerCase() &&
+      b.year === newDeptYear &&
       `${b.department}-${b.year}` !== oldKey
     );
-
     if (isDuplicate) {
       alert(`Budget untuk departemen "${trimmedName}" pada tahun ${newDeptYear} sudah ada!`);
       return;
     }
-
     const finalBudget = Number(newDeptBudget);
-
     if (oldKey) {
       if (oldKey === newKey) {
         setDeptBudgets(prev => prev.map(b => (b.department === trimmedName && b.year === newDeptYear) ? { ...b, budget: finalBudget } : b));
@@ -126,7 +118,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     } else {
       setDeptBudgets(prev => [...prev, { department: trimmedName, year: newDeptYear, budget: finalBudget, actual: 0 }]);
     }
-
     syncSettingsToParent();
     setIsBudgetModalOpen(false);
     setSaveSection(editingBudgetKey ? 'Update Budget' : 'Tambah Budget');
@@ -142,31 +133,50 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   // Role CRUD Logic
   const resetRoleForm = () => {
-    setEditingRoleId(null); setRoleFormName(''); setRoleFormAccess('Recruiter');
-    setRoleFormStatus('Active'); setRoleFormDescription(''); setRoleFormPassword('');
+    setEditingRoleId(null); setRoleFormName(''); setRoleFormEmail(''); // 🔹 BARU
+    setRoleFormAccess('Recruiter'); setRoleFormStatus('Active');
+    setRoleFormDescription(''); setRoleFormPassword('');
     setRoleFormPermissions({ create: false, review: true, update: false, delete: false, email: true, whatsapp: false, lockSettings: false, lockHistory: false });
     setShowPassword(false);
   };
+
   const openCreateRole = () => { resetRoleForm(); setIsRoleModalOpen(true); };
+
   const openEditRole = (role: AdminRole) => {
-    setEditingRoleId(role.id); setRoleFormName(role.roleName); setRoleFormAccess(role.accessLevel);
-    setRoleFormStatus(role.status); setRoleFormDescription(role.description); setRoleFormPermissions({ ...role.permissions });
+    setEditingRoleId(role.id); setRoleFormName(role.roleName);
+    setRoleFormEmail(role.email || ''); // 🔹 BARU
+    setRoleFormAccess(role.accessLevel); setRoleFormStatus(role.status);
+    setRoleFormDescription(role.description); setRoleFormPermissions({ ...role.permissions });
     setRoleFormPassword(role.password || ''); setShowPassword(false); setIsRoleModalOpen(true);
   };
+
   const saveRole = (e: React.FormEvent) => {
     e.preventDefault();
     if (!roleFormName.trim()) return;
+    if (!roleFormEmail.trim()) { alert('Email role wajib diisi!'); return; } // 🔹 BARU
     if (!roleFormPassword.trim() && !editingRoleId) return;
+
     const nextRole: AdminRole = {
       id: editingRoleId || `ROLE-${String(adminRoles.length + 1).padStart(3, '0')}`,
-      roleName: roleFormName.trim(), accessLevel: roleFormAccess, status: roleFormStatus,
+      roleName: roleFormName.trim(),
+      email: roleFormEmail.trim(), // 🔹 BARU
+      accessLevel: roleFormAccess, status: roleFormStatus,
       description: roleFormDescription.trim(), permissions: { ...roleFormPermissions },
       password: roleFormPassword.trim() || (editingRoleId ? adminRoles.find(r => r.id === editingRoleId)?.password || '' : '')
     };
     setAdminRoles((prev) => editingRoleId ? prev.map((item) => (item.id === editingRoleId ? nextRole : item)) : [nextRole, ...prev]);
     resetRoleForm(); setIsRoleModalOpen(false);
+    syncSettingsToParent();
+    setSaveSection(editingRoleId ? 'Update Role' : 'Tambah Role');
+    setSaveSuccess(true);
+    setTimeout(() => { setSaveSuccess(false); setSaveSection(''); }, 3000);
   };
-  const deleteRole = (id: string) => setAdminRoles((prev) => prev.filter((item) => item.id !== id));
+
+  const deleteRole = (id: string) => {
+    if (!window.confirm(`Hapus role ini?`)) return;
+    setAdminRoles((prev) => prev.filter((item) => item.id !== id));
+    syncSettingsToParent();
+  };
 
   const handleSaveGlobal = (e: React.FormEvent, section: string = 'Semua') => {
     e.preventDefault();
@@ -183,7 +193,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-            <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" /> Pengaturan Rekrutmen &amp; SLA
+            <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" /> Pengaturan Rekrutmen & SLA
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm">Sesuaikan ambang batas ATS, integrasi kalender, target SLA, dan budget cost hiring departemen.</p>
         </div>
@@ -311,7 +321,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         </div>
 
-        {/* Card 3: Budget Cost Hiring per Department (Multi-Year Table) */}
+        {/* Card 3: Budget Cost Hiring per Department */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 lg:col-span-2 flex flex-col">
           <div className="space-y-4 flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-2">
@@ -323,8 +333,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <Plus className="w-3.5 h-3.5" /> Tambah / Edit Budget
               </button>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">Atur batas budget tahunan untuk perekrutan per divisi. Klik tombol Edit untuk mengubah nilai budget atau tahun.</p>
-
+            <p className="text-xs text-slate-500 leading-relaxed">Atur batas budget tahunan untuk perekrutan per divisi.</p>
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider">
@@ -351,7 +360,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={4} className="p-8 text-center text-slate-400 font-medium">Belum ada data budget. Silakan tambah departemen baru.</td></tr>
+                    <tr><td colSpan={4} className="p-8 text-center text-slate-400 font-medium">Belum ada data budget.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -402,7 +411,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         </div>
 
-        {/* Card 5: Admin Role Management */}
+        {/* Card 5: Admin Role Management — 🔹 UPDATED DENGAN FIELD EMAIL */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sm:p-6 lg:col-span-2 flex flex-col">
           <div className="space-y-4 flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-2">
@@ -410,16 +419,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               <button onClick={openCreateRole} className="inline-flex items-center gap-2 self-start rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"><Plus className="w-3.5 h-3.5" /> Tambah Role</button>
             </div>
             <div className="overflow-x-auto rounded-2xl border border-slate-100">
-              <table className="w-full min-w-[760px] text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider"><tr><th className="p-4">Role</th><th className="p-4">Access Level</th><th className="p-4">Status</th><th className="p-4">Deskripsi</th><th className="p-4 text-right">Aksi</th></tr></thead>
+              <table className="w-full min-w-[860px] text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="p-4">Role</th>
+                    <th className="p-4">Email Pengirim</th>
+                    <th className="p-4">Access Level</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Deskripsi</th>
+                    <th className="p-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {adminRoles.map((role) => (
                     <tr key={role.id} className="align-top">
                       <td className="p-4"><div className="font-bold text-slate-800">{role.roleName}</div><div className="text-[10px] font-semibold text-slate-400">{role.id}</div></td>
+                      <td className="p-4"><div className="flex items-center gap-1.5 text-slate-700 font-medium"><Mail className="w-3 h-3 text-indigo-500 shrink-0" /><span className="truncate max-w-[180px]" title={role.email}>{role.email || '-'}</span></div></td>
                       <td className="p-4 text-slate-600">{role.accessLevel}</td>
                       <td className="p-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${role.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{role.status}</span></td>
                       <td className="p-4 text-slate-500 leading-6">{role.description}</td>
-                      <td className="p-4"><div className="flex items-center justify-end gap-2"><button onClick={() => openEditRole(role)} className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700" title="Edit role"><Edit3 className="w-3.5 h-3.5" /></button><button onClick={() => { if (window.confirm(`Hapus role ${role.roleName}?`)) deleteRole(role.id); }} className="rounded-lg border border-rose-100 p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700" title="Hapus role"><Trash2 className="w-3.5 h-3.5" /></button></div></td>
+                      <td className="p-4"><div className="flex items-center justify-end gap-2"><button onClick={() => openEditRole(role)} className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700" title="Edit role"><Edit3 className="w-3.5 h-3.5" /></button><button onClick={() => deleteRole(role.id)} className="rounded-lg border border-rose-100 p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700" title="Hapus role"><Trash2 className="w-3.5 h-3.5" /></button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -468,51 +487,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5 sm:p-6">
-              <div>
-                <h4 className="text-lg font-extrabold text-slate-800">{editingBudgetKey ? 'Edit Budget' : 'Tambah Budget Baru'}</h4>
-                <p className="text-xs text-slate-400">{editingBudgetKey ? 'Ubah alokasi budget, departemen, atau tahun.' : 'Buat alokasi budget untuk departemen baru pada tahun tertentu.'}</p>
-              </div>
+              <div><h4 className="text-lg font-extrabold text-slate-800">{editingBudgetKey ? 'Edit Budget' : 'Tambah Budget Baru'}</h4><p className="text-xs text-slate-400">{editingBudgetKey ? 'Ubah alokasi budget, departemen, atau tahun.' : 'Buat alokasi budget untuk departemen baru.'}</p></div>
               <button onClick={() => setIsBudgetModalOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleSaveBudget} className="space-y-4 p-5 sm:p-6">
               <div><label className="mb-1 block text-xs font-bold text-slate-600">Nama Departemen</label><input type="text" required value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none" placeholder="Contoh: Finance" /></div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-600">Tahun Anggaran</label>
-                <input type="number" min="2020" max="2100" required value={newDeptYear} onChange={(e) => setNewDeptYear(Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="2027" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-600">Alokasi Budget (IDR)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">Rp</span>
-                  <input
-                    type="text" inputMode="numeric"
-                    value={newDeptBudget === 0 ? '' : newDeptBudget.toString()}
-                    onChange={(e) => { const val = sanitizeNumberInput(e.target.value); setNewDeptBudget(val === '' ? 0 : Number(val)); }}
-                    placeholder="0"
-                    className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <p className="text-[9px] text-slate-400 mt-1">Isi 0 jika belum ada alokasi budget.</p>
-              </div>
-              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 mt-2">
-                <button type="button" onClick={() => setIsBudgetModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100">Batal</button>
-                <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700">{editingBudgetKey ? 'Simpan Perubahan' : 'Tambah'}</button>
-              </div>
+              <div><label className="mb-1 block text-xs font-bold text-slate-600">Tahun Anggaran</label><input type="number" min="2020" max="2100" required value={newDeptYear} onChange={(e) => setNewDeptYear(Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="2027" /></div>
+              <div><label className="mb-1 block text-xs font-bold text-slate-600">Alokasi Budget (IDR)</label><div className="relative"><span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">Rp</span><input type="text" inputMode="numeric" value={newDeptBudget === 0 ? '' : newDeptBudget.toString()} onChange={(e) => { const val = sanitizeNumberInput(e.target.value); setNewDeptBudget(val === '' ? 0 : Number(val)); }} placeholder="0" className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" /></div><p className="text-[9px] text-slate-400 mt-1">Isi 0 jika belum ada alokasi budget.</p></div>
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 mt-2"><button type="button" onClick={() => setIsBudgetModalOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100">Batal</button><button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700">{editingBudgetKey ? 'Simpan Perubahan' : 'Tambah'}</button></div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal: Role Management */}
+      {/* Modal: Role Management — 🔹 UPDATED DENGAN FIELD EMAIL */}
       {isRoleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-4">
           <div className="my-4 w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5 sm:p-6">
-              <div><h4 className="text-lg font-extrabold text-slate-800">{editingRoleId ? 'Edit Role Admin' : 'Tambah Role Admin'}</h4><p className="text-xs text-slate-400">Atur level akses dan deskripsi role untuk tim HR.</p></div>
+              <div><h4 className="text-lg font-extrabold text-slate-800">{editingRoleId ? 'Edit Role Admin' : 'Tambah Role Admin'}</h4><p className="text-xs text-slate-400">Atur level akses, email pengirim, dan deskripsi role untuk tim HR.</p></div>
               <button onClick={() => { resetRoleForm(); setIsRoleModalOpen(false); }} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={saveRole} className="space-y-4 p-5 sm:p-6">
               <div><label className="mb-1 block text-xs font-bold text-slate-600">Nama Role</label><input value={roleFormName} onChange={(e) => setRoleFormName(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none" placeholder="Contoh: Recruiter Lead" /></div>
+              
+              {/* 🔹 BARU: Field Email Role */}
+              <div>
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-600"><Mail className="w-3.5 h-3.5 text-indigo-600" /> Email Pengirim Role <span className="text-red-500">*</span></label>
+                <input type="email" required value={roleFormEmail} onChange={(e) => setRoleFormEmail(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none" placeholder="contoh: recruiter@careerhub.co.id" />
+                <p className="text-[9px] text-slate-400 mt-1">Email ini akan digunakan sebagai pengirim saat role ini mengirim email notifikasi ke kandidat.</p>
+              </div>
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div><label className="mb-1 block text-xs font-bold text-slate-600">Access Level</label><select value={roleFormAccess} onChange={(e) => setRoleFormAccess(e.target.value as AdminRole['accessLevel'])} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"><option value="Super Admin">Super Admin</option><option value="HR Manager">HR Manager</option><option value="Recruiter">Recruiter</option><option value="Interviewer">Interviewer</option><option value="Viewer">Viewer</option></select></div>
                 <div><label className="mb-1 block text-xs font-bold text-slate-600">Status</label><select value={roleFormStatus} onChange={(e) => setRoleFormStatus(e.target.value as AdminRole['status'])} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
@@ -527,7 +532,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <p className="text-[9px] text-slate-400 mt-1">{editingRoleId ? 'Biarkan kosong untuk mempertahankan password lama' : 'Password digunakan untuk login ke sistem CareerHub'}</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <label className="mb-3 block text-[10px] font-black text-slate-500 uppercase tracking-widest">Akses &amp; Izin (Permissions)</label>
+                <label className="mb-3 block text-[10px] font-black text-slate-500 uppercase tracking-widest">Akses & Izin (Permissions)</label>
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4">
                   {[{ key: 'create', label: 'Create Data' }, { key: 'review', label: 'Review / View' }, { key: 'update', label: 'Update Data' }, { key: 'delete', label: 'Delete Data' }, { key: 'email', label: 'Kirim Email' }, { key: 'whatsapp', label: 'Kirim WhatsApp' }, { key: 'lockSettings', label: 'Lock Settings' }, { key: 'lockHistory', label: 'Lock History' }].map((p) => (
                     <label key={p.key} className="flex items-center gap-2.5 cursor-pointer group">
